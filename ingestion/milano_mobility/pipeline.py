@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -214,7 +215,10 @@ def run_pipeline(
 
 
 def _run_dbt() -> None:
-    project_dir = Path(__import__("os").getenv("DBT_PROJECT_DIR", "/workspace/transformations/dbt"))
+    source_checkout = Path(__file__).resolve().parents[2]
+    project_dir = Path(
+        os.getenv("DBT_PROJECT_DIR", str(source_checkout / "transformations" / "dbt"))
+    )
     subprocess.run(
         [
             "dbt",
