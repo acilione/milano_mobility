@@ -1,0 +1,9 @@
+date,area_id,temperature_min_c,temperature_max_c,precipitation_mm,weather_code
+2026-07-28,milano,21.0,31.0,0.0,0
+2026-07-29,milano,20.5,30.0,1.2,61
+2026-07-30,milano,19.0,29.0,0.0,1
+2026-07-31,milano,20.0,30.5,0.0,1
+2026-08-01,milano,21.5,32.0,0.0,0
+2026-08-02,milano,22.0,33.0,0.0,0
+2026-08-03,milano,21.0,31.0,2.5,63
+2026-08-04,milano,20.0,29.5,0.4,51

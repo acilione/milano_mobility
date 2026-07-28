@@ -1,0 +1,32 @@
+source:
+  name: milano_gtfs
+  schedule: "0 6 * * *"
+  timezone: Europe/Rome
+  request_timeout_seconds: 60
+  retry_attempts: 4
+
+validation:
+  invalid_coordinate_threshold: 0.005
+  arrival_departure_tolerance_seconds: 300
+  required_files:
+    - agency.txt
+    - stops.txt
+    - routes.txt
+    - trips.txt
+    - stop_times.txt
+
+storage:
+  raw_bucket: raw
+  quarantine_bucket: quarantine
+  curated_bucket: curated
+
+service_area:
+  area_id: milano
+  latitude: 45.4642
+  longitude: 9.1900
+
+observability:
+  duration_warning_seconds: 1800
+  duration_critical_seconds: 3600
+  source_freshness_warning_hours: 48
+  row_count_deviation_ratio: 0.30

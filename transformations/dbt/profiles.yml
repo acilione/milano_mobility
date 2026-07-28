@@ -1,0 +1,13 @@
+milano_mobility:
+  target: local
+  outputs:
+    local:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'postgres') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | int }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'mobility') }}"
+      schema: public
+      user: "{{ env_var('TRANSFORMER_DB_USER', 'transformer') }}"
+      password: "{{ env_var('TRANSFORMER_DB_PASSWORD', 'transformer_dev') }}"
+      threads: 4
+      connect_timeout: 10

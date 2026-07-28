@@ -1,0 +1,4 @@
+stop_id,stop_code,stop_name,stop_lat,stop_lon,zone_id,location_type,parent_station
+S1,DUOMO,Duomo,45.464170,9.189990,Mi1,0,
+S2,CENTRALE,Centrale FS,45.485890,9.204440,Mi1,0,
+S3,CADORNA,Cadorna FN,45.468600,9.176590,Mi1,0,

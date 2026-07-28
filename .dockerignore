@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+data
+logs
+tmp
+transformations/dbt/target
+transformations/dbt/logs
+transformations/dbt/dbt_packages
+*.docx
+*.log
+.env

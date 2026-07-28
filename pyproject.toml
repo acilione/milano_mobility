@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools==75.8.0", "wheel==0.45.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "milano-mobility"
+version = "1.0.0"
+description = "A local-first batch data platform for versioned Milan public-transport schedules."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = { text = "MIT" }
+authors = [{ name = "Milano Mobility Data Platform" }]
+dependencies = [
+  "boto3==1.36.26",
+  "psycopg[binary,pool]==3.2.4",
+  "PyYAML==6.0.2",
+  "requests==2.32.3",
+  "structlog==25.1.0",
+  "tenacity==9.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy==1.15.0",
+  "pytest==8.3.4",
+  "pytest-cov==6.0.0",
+  "ruff==0.9.7",
+  "types-PyYAML==6.0.12.20241230",
+  "types-requests==2.32.0.20241016",
+]
+dbt = ["dbt-postgres==1.9.0"]
+
+[project.scripts]
+mobility = "milano_mobility.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "ingestion" }
+
+[tool.setuptools.packages.find]
+where = ["ingestion"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+  "integration: requires the Docker Compose services",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["ingestion", "tests", "orchestration"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+packages = ["milano_mobility"]
+mypy_path = "ingestion"
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["boto3", "botocore.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["milano_mobility"]
+omit = [
+  "ingestion/milano_mobility/cli.py",
+  "ingestion/milano_mobility/database.py",
+  "ingestion/milano_mobility/pipeline.py",
+  "ingestion/milano_mobility/storage.py",
+  "ingestion/milano_mobility/weather.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 80

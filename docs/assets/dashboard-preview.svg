@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">Milano Mobility dashboard preview</title>
+  <desc id="desc">Four analytical cards for departures, coverage, network changes, and weather.</desc>
+  <rect width="1200" height="600" fill="#f3f6fa"/>
+  <rect x="32" y="28" width="1136" height="72" rx="12" fill="#17324d"/>
+  <text x="64" y="74" fill="#fff" font-family="Arial,sans-serif" font-size="29" font-weight="700">Milano Mobility — Scheduled Network</text>
+  <text x="950" y="72" fill="#b9d9ed" font-family="Arial,sans-serif" font-size="16">Snapshot 2026-08-04</text>
+  <g font-family="Arial,sans-serif">
+    <rect x="32" y="124" width="548" height="200" rx="12" fill="#fff" stroke="#d7e1ea"/>
+    <text x="56" y="158" fill="#17324d" font-size="18" font-weight="700">Scheduled departures by service hour</text>
+    <line x1="72" y1="286" x2="540" y2="286" stroke="#8295a8"/>
+    <line x1="72" y1="190" x2="72" y2="286" stroke="#8295a8"/>
+    <polyline points="72,270 140,246 208,255 276,198 344,212 412,174 480,224 540,242" fill="none" stroke="#e51b23" stroke-width="4"/>
+    <text x="72" y="308" fill="#62778a" font-size="12">06</text><text x="268" y="308" fill="#62778a" font-size="12">12</text><text x="530" y="308" fill="#62778a" font-size="12">24+</text>
+
+    <rect x="604" y="124" width="564" height="200" rx="12" fill="#fff" stroke="#d7e1ea"/>
+    <text x="628" y="158" fill="#17324d" font-size="18" font-weight="700">Network changes</text>
+    <rect x="642" y="190" width="128" height="92" rx="8" fill="#dff3e5"/><text x="680" y="226" fill="#277946" font-size="28" font-weight="700">3</text><text x="662" y="260" fill="#277946" font-size="14">Added</text>
+    <rect x="818" y="190" width="128" height="92" rx="8" fill="#fff2d6"/><text x="856" y="226" fill="#9a6b00" font-size="28" font-weight="700">2</text><text x="838" y="260" fill="#9a6b00" font-size="14">Modified</text>
+    <rect x="994" y="190" width="128" height="92" rx="8" fill="#fde2e2"/><text x="1032" y="226" fill="#9c3434" font-size="28" font-weight="700">1</text><text x="1012" y="260" fill="#9c3434" font-size="14">Removed</text>
+
+    <rect x="32" y="348" width="548" height="220" rx="12" fill="#fff" stroke="#d7e1ea"/>
+    <text x="56" y="382" fill="#17324d" font-size="18" font-weight="700">Stops by route</text>
+    <rect x="92" y="420" width="408" height="24" rx="4" fill="#e51b23"/><text x="56" y="438" fill="#62778a" font-size="14">M1</text>
+    <rect x="92" y="466" width="324" height="24" rx="4" fill="#009d58"/><text x="56" y="484" fill="#62778a" font-size="14">M2</text>
+    <rect x="92" y="512" width="244" height="24" rx="4" fill="#f5b51b"/><text x="56" y="530" fill="#62778a" font-size="14">M3</text>
+
+    <rect x="604" y="348" width="564" height="220" rx="12" fill="#fff" stroke="#d7e1ea"/>
+    <text x="628" y="382" fill="#17324d" font-size="18" font-weight="700">Daily context</text>
+    <text x="646" y="432" fill="#62778a" font-size="14">Weather</text><text x="646" y="470" fill="#17324d" font-size="30" font-weight="700">29.5°C</text>
+    <text x="830" y="432" fill="#62778a" font-size="14">Precipitation</text><text x="830" y="470" fill="#17324d" font-size="30" font-weight="700">0.4 mm</text>
+    <text x="1030" y="432" fill="#62778a" font-size="14">Service</text><text x="1030" y="470" fill="#17324d" font-size="24" font-weight="700">Weekday</text>
+    <text x="646" y="532" fill="#62778a" font-size="14">Weather gaps are advisory and never block transport publication.</text>
+  </g>
+</svg>

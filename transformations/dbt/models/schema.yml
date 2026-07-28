@@ -1,0 +1,95 @@
+version: 2
+
+models:
+  - name: dim_stop_history
+    description: Type-2 history for each stop, bounded by source snapshot dates.
+    columns:
+      - name: stop_sk
+        description: Surrogate key for one stop version.
+        tests: [not_null, unique]
+      - name: stop_id
+        description: Natural GTFS stop identifier.
+        tests: [not_null]
+      - name: is_current
+        tests:
+          - accepted_values:
+              values: [true, false]
+
+  - name: dim_route_history
+    description: Type-2 history for each route, bounded by source snapshot dates.
+    columns:
+      - name: route_sk
+        description: Surrogate key for one route version.
+        tests: [not_null, unique]
+      - name: route_id
+        tests: [not_null]
+      - name: route_type
+        tests:
+          - accepted_values:
+              values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+  - name: dim_date
+    description: Conformed calendar date enriched with Milan public holidays.
+    columns:
+      - name: date_key
+        tests: [not_null, unique]
+
+  - name: dim_weather_day
+    description: Daily weather observations by service area; missing rows are advisory.
+    columns:
+      - name: date_key
+        tests: [not_null]
+      - name: area_id
+        tests: [not_null]
+
+  - name: fact_scheduled_trip
+    description: One scheduled trip for a snapshot and service date.
+    columns:
+      - name: scheduled_trip_sk
+        tests: [not_null, unique]
+      - name: route_sk
+        tests:
+          - relationships:
+              to: ref('dim_route')
+              field: route_sk
+      - name: direction_id
+        tests:
+          - accepted_values:
+              values: [0, 1]
+              config:
+                where: "direction_id is not null"
+
+  - name: fact_stop_event
+    description: One scheduled call at a stop for a trip and service date.
+    columns:
+      - name: stop_event_sk
+        tests: [not_null, unique]
+      - name: route_sk
+        tests:
+          - relationships:
+              to: ref('dim_route')
+              field: route_sk
+      - name: stop_sk
+        tests:
+          - relationships:
+              to: ref('dim_stop')
+              field: stop_sk
+      - name: date_key
+        tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+
+  - name: fact_network_change
+    description: Added, removed, and modified entities between consecutive snapshots.
+    columns:
+      - name: network_change_sk
+        tests: [not_null, unique]
+      - name: change_type
+        tests:
+          - accepted_values:
+              values: ['ADDED', 'REMOVED', 'MODIFIED']
+      - name: entity_type
+        tests:
+          - accepted_values:
+              values: ['stop', 'route', 'trip']

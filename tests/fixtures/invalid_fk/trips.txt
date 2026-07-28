@@ -1,0 +1,2 @@
+route_id,service_id,trip_id,direction_id
+MISSING_ROUTE,DAILY,T1,0

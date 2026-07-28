@@ -1,0 +1,4 @@
+stop_id,stop_code,stop_name,stop_lat,stop_lon,zone_id,location_type,parent_station
+S1,DUOMO,Duomo,45.464170,9.189990,Mi1,0,
+S2,CENTRALE,Milano Centrale FS,45.485950,9.204500,Mi1,0,
+S4,PORTA_VENEZIA,Porta Venezia,45.474650,9.205290,Mi1,0,

@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Data and runtime state
+data/
+logs/
+tmp/
+*.log
+*.pid
+*.sqlite
+*.db
+
+# dbt
+transformations/dbt/target/
+transformations/dbt/logs/
+transformations/dbt/dbt_packages/
+transformations/dbt/.user.yml
+
+# Airflow
+airflow.cfg
+airflow-webserver.pid
+standalone_admin_password.txt
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# IDE and operating system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local source documents
+*.docx
+~$*

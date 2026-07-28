@@ -1,0 +1,3 @@
+route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_color,route_text_color
+R1,ATM,M1,Sesto 1 Maggio FS - Rho Fieramilano/Bisceglie,Red metro line,1,E51B23,FFFFFF
+R2,ATM,M2,Assago Milanofiori Forum - Cologno Nord/Gessate,Green metro line,1,009D58,FFFFFF

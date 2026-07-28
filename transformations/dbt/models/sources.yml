@@ -1,0 +1,25 @@
+version: 2
+
+sources:
+  - name: audit
+    schema: audit
+    description: Ingestion metadata and lifecycle status for every downloaded payload.
+    tables:
+      - name: ingestion_manifest
+        description: One record for every attempted source payload.
+        loaded_at_field: updated_at
+        freshness:
+          warn_after: {count: 48, period: hour}
+          error_after: {count: 72, period: hour}
+  - name: gtfs
+    schema: staging
+    description: Typed one-to-one copies of valid GTFS source files.
+    tables:
+      - name: agency
+      - name: stops
+      - name: routes
+      - name: trips
+      - name: stop_times
+      - name: calendar
+      - name: calendar_dates
+      - name: weather_day
