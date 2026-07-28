@@ -43,7 +43,13 @@ def test_valid_feed_is_idempotent_and_published() -> None:
     )
     assert result.status is ManifestStatus.PUBLISHED
     assert duplicate.status is ManifestStatus.SKIPPED
-    with psycopg.connect(settings.postgres_dsn) as connection:
+    with psycopg.connect(
+        host=settings.postgres_host,
+        port=settings.postgres_port,
+        dbname=settings.postgres_db,
+        user=os.getenv("BI_DB_USER", "bi_reader"),
+        password=os.getenv("BI_DB_PASSWORD", "bi_reader_dev"),
+    ) as connection:
         mart_count = connection.execute("select count(*) from marts.fact_stop_event").fetchone()
     assert mart_count is not None
     assert mart_count[0] > 0

@@ -48,6 +48,8 @@ jobs:
           INGESTION_DB_PASSWORD: ingestion_dev
           TRANSFORMER_DB_USER: transformer
           TRANSFORMER_DB_PASSWORD: transformer_dev
+          BI_DB_USER: bi_reader
+          BI_DB_PASSWORD: bi_reader_dev
           S3_ENDPOINT_URL: http://localhost:9000
           DBT_PROJECT_DIR: ${{ github.workspace }}/transformations/dbt
       - if: always()
