@@ -1,35 +1,125 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
-  <title id="title">Milano Mobility dashboard preview</title>
-  <desc id="desc">Four analytical cards for departures, coverage, network changes, and weather.</desc>
-  <rect width="1200" height="600" fill="#f3f6fa"/>
-  <rect x="32" y="28" width="1136" height="72" rx="12" fill="#17324d"/>
-  <text x="64" y="74" fill="#fff" font-family="Arial,sans-serif" font-size="29" font-weight="700">Milano Mobility — Scheduled Network</text>
-  <text x="950" y="72" fill="#b9d9ed" font-family="Arial,sans-serif" font-size="16">Snapshot 2026-08-04</text>
-  <g font-family="Arial,sans-serif">
-    <rect x="32" y="124" width="548" height="200" rx="12" fill="#fff" stroke="#d7e1ea"/>
-    <text x="56" y="158" fill="#17324d" font-size="18" font-weight="700">Scheduled departures by service hour</text>
-    <line x1="72" y1="286" x2="540" y2="286" stroke="#8295a8"/>
-    <line x1="72" y1="190" x2="72" y2="286" stroke="#8295a8"/>
-    <polyline points="72,270 140,246 208,255 276,198 344,212 412,174 480,224 540,242" fill="none" stroke="#e51b23" stroke-width="4"/>
-    <text x="72" y="308" fill="#62778a" font-size="12">06</text><text x="268" y="308" fill="#62778a" font-size="12">12</text><text x="530" y="308" fill="#62778a" font-size="12">24+</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Milano Mobility Observatory dashboard</title>
+  <desc id="desc">A dark visual dashboard with network KPIs, hourly departures, route coverage, and a scheduled-service trend.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#10251f"/>
+      <stop offset="1" stop-color="#091814"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
+      <stop stop-color="#48e3b5"/>
+      <stop offset="1" stop-color="#c8ff63"/>
+    </linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#48e3b5" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#48e3b5" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grid" width="54" height="54" patternUnits="userSpaceOnUse">
+      <path d="M54 0H0V54" fill="none" stroke="#d9f0e2" stroke-opacity=".045"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="15" stdDeviation="20" flood-color="#000" flood-opacity=".22"/>
+    </filter>
+  </defs>
 
-    <rect x="604" y="124" width="564" height="200" rx="12" fill="#fff" stroke="#d7e1ea"/>
-    <text x="628" y="158" fill="#17324d" font-size="18" font-weight="700">Network changes</text>
-    <rect x="642" y="190" width="128" height="92" rx="8" fill="#dff3e5"/><text x="680" y="226" fill="#277946" font-size="28" font-weight="700">3</text><text x="662" y="260" fill="#277946" font-size="14">Added</text>
-    <rect x="818" y="190" width="128" height="92" rx="8" fill="#fff2d6"/><text x="856" y="226" fill="#9a6b00" font-size="28" font-weight="700">2</text><text x="838" y="260" fill="#9a6b00" font-size="14">Modified</text>
-    <rect x="994" y="190" width="128" height="92" rx="8" fill="#fde2e2"/><text x="1032" y="226" fill="#9c3434" font-size="28" font-weight="700">1</text><text x="1012" y="260" fill="#9c3434" font-size="14">Removed</text>
+  <rect width="1440" height="900" fill="#07110f"/>
+  <rect width="1440" height="900" fill="url(#grid)"/>
+  <circle cx="160" cy="90" r="300" fill="#48e3b5" opacity=".045"/>
 
-    <rect x="32" y="348" width="548" height="220" rx="12" fill="#fff" stroke="#d7e1ea"/>
-    <text x="56" y="382" fill="#17324d" font-size="18" font-weight="700">Stops by route</text>
-    <rect x="92" y="420" width="408" height="24" rx="4" fill="#e51b23"/><text x="56" y="438" fill="#62778a" font-size="14">M1</text>
-    <rect x="92" y="466" width="324" height="24" rx="4" fill="#009d58"/><text x="56" y="484" fill="#62778a" font-size="14">M2</text>
-    <rect x="92" y="512" width="244" height="24" rx="4" fill="#f5b51b"/><text x="56" y="530" fill="#62778a" font-size="14">M3</text>
+  <g font-family="Inter,Arial,sans-serif">
+    <g transform="translate(32 24)">
+      <circle cx="17" cy="17" r="16" fill="none" stroke="#c8ff63"/>
+      <rect x="9" y="8" width="4" height="20" rx="2" fill="#c8ff63"/>
+      <rect x="16" y="12" width="4" height="17" rx="2" fill="#48e3b5"/>
+      <rect x="23" y="6" width="4" height="19" rx="2" fill="#68b5ff"/>
+      <text x="50" y="23" fill="#eef7f1" font-size="16" font-weight="700">Milano Mobility Observatory</text>
+    </g>
+    <circle cx="1283" cy="41" r="6" fill="#48e3b5"/>
+    <text x="1297" y="46" fill="#91a49b" font-size="12">Published marts online</text>
+    <line x1="32" y1="76" x2="1408" y2="76" stroke="#d9f0e2" stroke-opacity=".12"/>
 
-    <rect x="604" y="348" width="564" height="220" rx="12" fill="#fff" stroke="#d7e1ea"/>
-    <text x="628" y="382" fill="#17324d" font-size="18" font-weight="700">Daily context</text>
-    <text x="646" y="432" fill="#62778a" font-size="14">Weather</text><text x="646" y="470" fill="#17324d" font-size="30" font-weight="700">29.5°C</text>
-    <text x="830" y="432" fill="#62778a" font-size="14">Precipitation</text><text x="830" y="470" fill="#17324d" font-size="30" font-weight="700">0.4 mm</text>
-    <text x="1030" y="432" fill="#62778a" font-size="14">Service</text><text x="1030" y="470" fill="#17324d" font-size="24" font-weight="700">Weekday</text>
-    <text x="646" y="532" fill="#62778a" font-size="14">Weather gaps are advisory and never block transport publication.</text>
+    <text x="32" y="146" fill="#c8ff63" font-size="12" font-weight="800" letter-spacing="2">SCHEDULED TRANSPORT INTELLIGENCE / MILAN</text>
+    <text x="32" y="226" fill="#eef7f1" font-size="69" font-weight="750" letter-spacing="-4">See the network.</text>
+    <text x="32" y="300" fill="#48e3b5" font-size="69" font-weight="750" letter-spacing="-4">Read the rhythm.</text>
+    <text x="32" y="346" fill="#91a49b" font-size="17">A living view of planned public-transport supply, historical network versions,</text>
+    <text x="32" y="372" fill="#91a49b" font-size="17">service-day patterns, and quality-controlled data products.</text>
+
+    <line x1="990" y1="272" x2="990" y2="374" stroke="#d9f0e2" stroke-opacity=".12"/>
+    <text x="1020" y="294" fill="#91a49b" font-size="11" letter-spacing="2">SOURCE SNAPSHOT</text>
+    <text x="1020" y="338" fill="#eef7f1" font-size="29" font-weight="750">2026-07-28</text>
+    <text x="1020" y="366" fill="#91a49b" font-size="12">Auto-refreshed visual mart</text>
+
+    <g filter="url(#shadow)">
+      <g transform="translate(32 414)">
+        <rect width="260" height="122" rx="16" fill="url(#panel)" stroke="#d9f0e2" stroke-opacity=".12"/>
+        <text x="20" y="32" fill="#91a49b" font-size="11" letter-spacing="1">SCHEDULED TRIPS</text>
+        <text x="20" y="77" fill="#eef7f1" font-size="34" font-weight="750">68</text>
+        <text x="20" y="103" fill="#91a49b" font-size="11">Published service window</text>
+      </g>
+      <g transform="translate(307 414)">
+        <rect width="260" height="122" rx="16" fill="url(#panel)" stroke="#d9f0e2" stroke-opacity=".12"/>
+        <text x="20" y="32" fill="#91a49b" font-size="11" letter-spacing="1">STOP EVENTS</text>
+        <text x="20" y="77" fill="#eef7f1" font-size="34" font-weight="750">204</text>
+        <text x="20" y="103" fill="#91a49b" font-size="11">Quality-tested scheduled calls</text>
+      </g>
+      <g transform="translate(582 414)">
+        <rect width="260" height="122" rx="16" fill="url(#panel)" stroke="#d9f0e2" stroke-opacity=".12"/>
+        <text x="20" y="32" fill="#91a49b" font-size="11" letter-spacing="1">ACTIVE STOPS</text>
+        <text x="20" y="77" fill="#eef7f1" font-size="34" font-weight="750">3</text>
+        <text x="20" y="103" fill="#91a49b" font-size="11">Current type-2 entities</text>
+      </g>
+      <g transform="translate(857 414)">
+        <rect width="260" height="122" rx="16" fill="url(#panel)" stroke="#d9f0e2" stroke-opacity=".12"/>
+        <text x="20" y="32" fill="#91a49b" font-size="11" letter-spacing="1">ACTIVE ROUTES</text>
+        <text x="20" y="77" fill="#eef7f1" font-size="34" font-weight="750">1</text>
+        <text x="20" y="103" fill="#91a49b" font-size="11">Current published network</text>
+      </g>
+      <g transform="translate(1132 414)">
+        <rect width="276" height="122" rx="16" fill="url(#panel)" stroke="#d9f0e2" stroke-opacity=".12"/>
+        <text x="20" y="32" fill="#91a49b" font-size="11" letter-spacing="1">SERVICE DAYS</text>
+        <text x="20" y="77" fill="#eef7f1" font-size="34" font-weight="750">34</text>
+        <text x="20" y="103" fill="#91a49b" font-size="11">Calendar and holiday enriched</text>
+      </g>
+    </g>
+
+    <g transform="translate(32 552)" filter="url(#shadow)">
+      <rect width="840" height="310" rx="18" fill="url(#panel)" stroke="#d9f0e2" stroke-opacity=".12"/>
+      <text x="24" y="38" fill="#eef7f1" font-size="18" font-weight="700">Departures and scheduled service</text>
+      <text x="24" y="63" fill="#91a49b" font-size="12">GTFS service hours remain valid beyond midnight.</text>
+      <rect x="704" y="23" width="108" height="28" rx="14" fill="none" stroke="#c8ff63" stroke-opacity=".35"/>
+      <text x="729" y="42" fill="#c8ff63" font-size="10">SUPPLY RHYTHM</text>
+      <line x1="36" y1="262" x2="804" y2="262" stroke="#d9f0e2" stroke-opacity=".12"/>
+      <rect x="116" y="135" width="42" height="127" rx="6" fill="url(#bar)"/>
+      <rect x="650" y="135" width="42" height="127" rx="6" fill="url(#bar)"/>
+      <text x="120" y="286" fill="#91a49b" font-size="10">06:00</text>
+      <text x="653" y="286" fill="#91a49b" font-size="10">24:00</text>
+      <path d="M38 225 L115 221 L192 220 L269 218 L346 214 L423 218 L500 216 L577 210 L654 215 L731 211 L803 207 L803 262 L38 262 Z" fill="url(#area)" opacity=".55"/>
+      <path d="M38 225 L115 221 L192 220 L269 218 L346 214 L423 218 L500 216 L577 210 L654 215 L731 211 L803 207" fill="none" stroke="#c8ff63" stroke-width="2"/>
+    </g>
+
+    <g transform="translate(888 552)" filter="url(#shadow)">
+      <rect width="520" height="310" rx="18" fill="url(#panel)" stroke="#d9f0e2" stroke-opacity=".12"/>
+      <text x="24" y="38" fill="#eef7f1" font-size="18" font-weight="700">Route coverage</text>
+      <text x="24" y="63" fill="#91a49b" font-size="12">Distinct scheduled stops by line.</text>
+      <rect x="24" y="103" width="42" height="29" rx="7" fill="#e51b23"/>
+      <text x="35" y="123" fill="#07110f" font-size="12" font-weight="850">M1</text>
+      <text x="84" y="116" fill="#eef7f1" font-size="13" font-weight="700">Sesto 1 Maggio FS - Rho Fiera</text>
+      <text x="84" y="139" fill="#91a49b" font-size="11">2 trip patterns</text>
+      <text x="454" y="116" fill="#eef7f1" font-size="15" font-weight="750">3</text>
+      <text x="428" y="139" fill="#91a49b" font-size="11">served stops</text>
+      <line x1="24" y1="166" x2="496" y2="166" stroke="#d9f0e2" stroke-opacity=".12"/>
+      <text x="24" y="205" fill="#91a49b" font-size="11" letter-spacing="1">DATA LINEAGE</text>
+      <circle cx="48" cy="247" r="12" fill="#c8ff63"/>
+      <circle cx="161" cy="247" r="12" fill="#48e3b5"/>
+      <circle cx="274" cy="247" r="12" fill="#68b5ff"/>
+      <circle cx="387" cy="247" r="12" fill="#ffc45c"/>
+      <line x1="60" y1="247" x2="149" y2="247" stroke="#d9f0e2" stroke-opacity=".3"/>
+      <line x1="173" y1="247" x2="262" y2="247" stroke="#d9f0e2" stroke-opacity=".3"/>
+      <line x1="286" y1="247" x2="375" y2="247" stroke="#d9f0e2" stroke-opacity=".3"/>
+      <text x="27" y="282" fill="#91a49b" font-size="10">Archive</text>
+      <text x="138" y="282" fill="#91a49b" font-size="10">Validate</text>
+      <text x="258" y="282" fill="#91a49b" font-size="10">Model</text>
+      <text x="371" y="282" fill="#91a49b" font-size="10">Observe</text>
+    </g>
   </g>
 </svg>

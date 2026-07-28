@@ -15,9 +15,10 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.lock requirements-dbt.lock pyproject.toml README.md ./
+COPY requirements.lock requirements-dbt.lock ./
 RUN pip install --no-cache-dir -r requirements-dbt.lock
 
+COPY pyproject.toml README.md ./
 COPY ingestion ./ingestion
 RUN pip install --no-cache-dir --no-deps .
 COPY transformations ./transformations

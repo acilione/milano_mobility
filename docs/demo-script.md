@@ -9,7 +9,9 @@ measures scheduled supply, not real-time punctuality.
 ## 1:00–2:00 — Start and ingest
 
 Run `docker compose --profile demo run --build --rm demo`. Show the final `PUBLISHED`
-result, then show the immutable ZIP and manifest in the MinIO raw bucket.
+result, then open the visual dashboard at <http://localhost:8501>. Use the KPI cards,
+service trend, and stop constellation to establish the analytical product before showing
+the immutable ZIP and manifest in the MinIO raw bucket.
 
 ## 2:00–3:00 — Quality and lineage
 

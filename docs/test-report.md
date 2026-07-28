@@ -15,8 +15,8 @@
 | Python byte-code compilation | Passed |
 | Ruff lint rules | Passed |
 | Ruff formatting check | Passed |
-| Strict mypy analysis | Passed, 10 package modules |
-| Unit and contract tests | Passed, 27 tests |
+| Strict mypy analysis | Passed, 11 package modules |
+| Unit and contract tests | Passed, 32 tests |
 | Measured unit coverage | 89.51% |
 | Valid fixture CLI gate | Passed |
 | Invalid foreign-key CLI gate | Passed, exit code 2 |
@@ -29,6 +29,7 @@
 | Duplicate-payload idempotency | Passed, returned `SKIPPED` |
 | Invalid foreign-key quarantine | Passed, returned `QUARANTINED` |
 | Raw, curated, and quarantine object persistence | Passed |
+| Read-only visual dashboard and JSON API | Passed |
 | English repository-content scan | Passed |
 
 The end-to-end run published 68 scheduled trips, 204 stop events, and six network-change
@@ -39,7 +40,8 @@ payload and quality report were persisted under the quarantine and curated prefi
 The checked-in CI integration job repeats the same contract on an ephemeral Linux runner:
 it starts PostgreSQL and MinIO, runs the versioned fixture through the pipeline and dbt
 mart, asserts a non-empty Gold fact, repeats the payload to assert `SKIPPED`, and loads a
-broken foreign-key fixture to assert `QUARANTINED`.
+broken foreign-key fixture to assert `QUARANTINED`. It then starts the visual dashboard
+through the read-only BI role and verifies that its API reports a ready analytical state.
 
 ## Fixture coverage
 

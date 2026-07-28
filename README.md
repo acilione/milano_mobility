@@ -29,8 +29,15 @@ reuse the cache. Repeating the command prints `SKIPPED`, demonstrating idempoten
 
 The core services remain available after the command:
 
+- Visual dashboard: <http://localhost:8501>
 - MinIO console: <http://localhost:9001> (`minio` / `minio_dev_password`)
 - PostgreSQL: `localhost:5432`, database `mobility`
+
+The dashboard is configured automatically and reads the published marts through the
+least-privilege `bi_reader` role. It includes network KPIs, service-volume trends, hourly
+departures, route coverage, a stop constellation, entity-change summaries, and visual
+data lineage. It has no external browser dependencies, so it also works offline after the
+images have been built.
 
 To stop them without deleting the generated data, run `docker compose down`.
 
@@ -45,6 +52,7 @@ docker compose up -d --build
 Open:
 
 - Airflow: <http://localhost:8080> (`admin` / `admin`)
+- Visual dashboard: <http://localhost:8501>
 - MinIO console: <http://localhost:9001> (`minio` / `minio_dev_password`)
 - Metabase: <http://localhost:3000>
 - PostgreSQL: `localhost:5432`, database `mobility`
