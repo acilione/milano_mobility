@@ -5,7 +5,6 @@ config-version: 2
 profile: milano_mobility
 
 model-paths: ["models"]
-seed-paths: ["seeds"]
 test-paths: ["tests"]
 macro-paths: ["macros"]
 target-path: target
@@ -25,14 +24,3 @@ models:
       +materialized: table
       +schema: marts
       +tags: ["gold"]
-
-seeds:
-  milano_mobility:
-    +schema: staging_dbt
-    +quote_columns: false
-    holidays:
-      +column_types:
-        date: date
-    weather_day:
-      +column_types:
-        date: date

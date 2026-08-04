@@ -16,8 +16,8 @@
 | Ruff lint rules | Passed |
 | Ruff formatting check | Passed |
 | Strict mypy analysis | Passed, 11 package modules |
-| Unit and contract tests | Passed, 33 tests |
-| Measured unit coverage | 80.61% |
+| Unit and contract tests | Passed, 35 tests |
+| Measured unit coverage | 80.84% |
 | Valid fixture CLI gate | Passed |
 | Invalid foreign-key CLI gate | Passed, exit code 2 |
 | dbt project parse | Passed |
@@ -26,7 +26,7 @@
 | Container image build | Passed |
 | PostgreSQL staging and dbt publication | Passed |
 | Full official GTFS streaming validation | Passed, 7,058,600 stop times |
-| dbt models and data tests | Passed, 51 of 51 in 29.83 seconds |
+| dbt models and data tests | Passed, 49 of 49 in 35.84 seconds |
 | Duplicate-payload idempotency | Passed, returned `SKIPPED` |
 | Invalid foreign-key quarantine | Passed, returned `QUARANTINED` |
 | Raw, curated, and quarantine object persistence | Passed |

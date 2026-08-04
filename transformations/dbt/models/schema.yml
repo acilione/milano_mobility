@@ -29,7 +29,7 @@ models:
               values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
   - name: dim_date
-    description: Conformed calendar date enriched with Milan public holidays.
+    description: Conformed calendar covering the active service window.
     columns:
       - name: date_key
         tests: [not_null, unique]

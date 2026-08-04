@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import quote_plus
 
 
@@ -15,27 +15,45 @@ def _env(name: str, default: str) -> str:
 class Settings:
     """Runtime settings shared by the CLI and Airflow tasks."""
 
-    postgres_host: str = _env("POSTGRES_HOST", "postgres")
-    postgres_port: int = int(_env("POSTGRES_PORT", "5432"))
-    postgres_db: str = _env("POSTGRES_DB", "mobility")
-    postgres_user: str = _env("INGESTION_DB_USER", "ingestion_writer")
-    postgres_password: str = _env("INGESTION_DB_PASSWORD", "ingestion_dev")
+    postgres_host: str = field(default_factory=lambda: _env("POSTGRES_HOST", "postgres"))
+    postgres_port: int = field(default_factory=lambda: int(_env("POSTGRES_PORT", "5432")))
+    postgres_db: str = field(default_factory=lambda: _env("POSTGRES_DB", "mobility"))
+    postgres_user: str = field(
+        default_factory=lambda: _env("INGESTION_DB_USER", "ingestion_writer")
+    )
+    postgres_password: str = field(
+        default_factory=lambda: _env("INGESTION_DB_PASSWORD", "ingestion_dev")
+    )
 
-    s3_endpoint_url: str = _env("S3_ENDPOINT_URL", "http://minio:9000")
-    s3_access_key: str = _env("S3_ACCESS_KEY", "minio")
-    s3_secret_key: str = _env("S3_SECRET_KEY", "minio_dev_password")
-    s3_region: str = _env("S3_REGION", "eu-south-1")
-    raw_bucket: str = _env("S3_RAW_BUCKET", "raw")
-    quarantine_bucket: str = _env("S3_QUARANTINE_BUCKET", "quarantine")
-    curated_bucket: str = _env("S3_CURATED_BUCKET", "curated")
+    s3_endpoint_url: str = field(
+        default_factory=lambda: _env("S3_ENDPOINT_URL", "http://minio:9000")
+    )
+    s3_access_key: str = field(default_factory=lambda: _env("S3_ACCESS_KEY", "minio"))
+    s3_secret_key: str = field(default_factory=lambda: _env("S3_SECRET_KEY", "minio_dev_password"))
+    s3_region: str = field(default_factory=lambda: _env("S3_REGION", "eu-south-1"))
+    raw_bucket: str = field(default_factory=lambda: _env("S3_RAW_BUCKET", "raw"))
+    quarantine_bucket: str = field(
+        default_factory=lambda: _env("S3_QUARANTINE_BUCKET", "quarantine")
+    )
+    curated_bucket: str = field(default_factory=lambda: _env("S3_CURATED_BUCKET", "curated"))
 
-    source_name: str = _env("GTFS_SOURCE_NAME", "milano_gtfs")
-    source_url: str = _env("GTFS_SOURCE_URL", "")
-    service_area_id: str = _env("SERVICE_AREA_ID", "milano")
-    service_area_latitude: float = float(_env("SERVICE_AREA_LATITUDE", "45.4642"))
-    service_area_longitude: float = float(_env("SERVICE_AREA_LONGITUDE", "9.1900"))
-    invalid_coordinate_threshold: float = float(_env("GTFS_INVALID_COORDINATE_THRESHOLD", "0.005"))
-    request_timeout_seconds: int = int(_env("GTFS_REQUEST_TIMEOUT_SECONDS", "60"))
+    source_name: str = field(default_factory=lambda: _env("GTFS_SOURCE_NAME", "gtfs"))
+    source_url: str = field(default_factory=lambda: _env("GTFS_SOURCE_URL", ""))
+    service_area_id: str = field(default_factory=lambda: _env("SERVICE_AREA_ID", "service-area"))
+    service_area_latitude: float = field(
+        default_factory=lambda: float(_env("SERVICE_AREA_LATITUDE", "0"))
+    )
+    service_area_longitude: float = field(
+        default_factory=lambda: float(_env("SERVICE_AREA_LONGITUDE", "0"))
+    )
+    service_timezone: str = field(default_factory=lambda: _env("SERVICE_TIMEZONE", "UTC"))
+    weather_api_url: str = field(default_factory=lambda: _env("WEATHER_API_URL", ""))
+    invalid_coordinate_threshold: float = field(
+        default_factory=lambda: float(_env("GTFS_INVALID_COORDINATE_THRESHOLD", "0.005"))
+    )
+    request_timeout_seconds: int = field(
+        default_factory=lambda: int(_env("GTFS_REQUEST_TIMEOUT_SECONDS", "60"))
+    )
 
     @property
     def postgres_dsn(self) -> str:

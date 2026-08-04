@@ -21,6 +21,18 @@ def test_dashboard_uses_bi_reader_environment(
     assert parameters["password"] == "visual_secret"
 
 
+def test_dashboard_metadata_comes_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DASHBOARD_TITLE", "City Network")
+    monkeypatch.setenv("SERVICE_AREA_NAME", "Example City")
+    monkeypatch.setenv("DASHBOARD_REFRESH_SECONDS", "45")
+
+    metadata = web._dashboard_metadata()
+
+    assert metadata["title"] == "City Network"
+    assert metadata["area_name"] == "Example City"
+    assert metadata["refresh_seconds"] == 45
+
+
 def test_json_default_serializes_warehouse_values() -> None:
     assert web._json_default(date(2026, 7, 28)) == "2026-07-28"
     assert web._json_default(Decimal("12.50")) == "12.50"
@@ -46,7 +58,8 @@ def test_dashboard_waits_cleanly_before_marts_exist(
 
 
 def test_dashboard_shell_contains_primary_visuals() -> None:
-    assert "Milano Mobility Observatory" in web.DASHBOARD_HTML
     assert "Departures by service hour" in web.DASHBOARD_HTML
-    assert "Stop constellation" in web.DASHBOARD_HTML
+    assert "Interactive stop map" in web.DASHBOARD_HTML
+    assert 'data-map-action="in"' in web.DASHBOARD_HTML
+    assert "connected routes" in web.DASHBOARD_HTML
     assert "/api/dashboard" in web.DASHBOARD_HTML

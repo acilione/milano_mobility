@@ -10,9 +10,9 @@ measures scheduled supply, not real-time punctuality.
 
 Run `docker compose --profile demo run --build --rm demo`. Show the final `PUBLISHED`
 result and complete official source row counts, then open the visual dashboard at
-<http://localhost:8501>. Use the 166-route coverage list, 4,909-point stop constellation,
-and service trend to establish the analytical product before showing the immutable ZIP,
-SHA-256 digest, and manifest in the MinIO raw bucket.
+<http://localhost:8501>. Use the route list, interactive stop map, and service trend to
+establish the analytical product before showing the immutable ZIP, SHA-256 digest, and
+manifest in the MinIO raw bucket.
 
 ## 2:00–3:00 — Quality and lineage
 

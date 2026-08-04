@@ -33,12 +33,15 @@ DEFAULT_ARGS = {
     "retry_exponential_backoff": True,
     "max_retry_delay": timedelta(minutes=15),
 }
+DAG_START_DATE = datetime.fromisoformat(os.getenv("AIRFLOW_DAG_START_DATE", "2024-01-01")).replace(
+    tzinfo=timezone.utc
+)
 
 
 @dag(
     dag_id="gtfs_ingestion",
-    schedule="0 6 * * *",
-    start_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    schedule=os.getenv("GTFS_INGESTION_SCHEDULE", "0 6 * * *"),
+    start_date=DAG_START_DATE,
     catchup=False,
     max_active_runs=1,
     default_args=DEFAULT_ARGS,

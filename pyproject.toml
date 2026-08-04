@@ -39,6 +39,9 @@ package-dir = { "" = "ingestion" }
 [tool.setuptools.packages.find]
 where = ["ingestion"]
 
+[tool.setuptools.package-data]
+milano_mobility = ["static/*.html"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"

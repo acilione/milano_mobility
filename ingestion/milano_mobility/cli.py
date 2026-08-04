@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -20,8 +21,8 @@ def _date(value: str) -> date:
         raise argparse.ArgumentTypeError("Date must use YYYY-MM-DD format") from error
 
 
-def _milan_today() -> date:
-    return datetime.now(ZoneInfo("Europe/Rome")).date()
+def _local_today() -> date:
+    return datetime.now(ZoneInfo(os.getenv("SERVICE_TIMEZONE", "UTC"))).date()
 
 
 def parser() -> argparse.ArgumentParser:
@@ -36,7 +37,7 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--snapshot-date",
         type=_date,
-        default=_milan_today(),
+        default=_local_today(),
         help="Acquisition date in YYYY-MM-DD format (defaults to today)",
     )
     run.add_argument("--pipeline-run-id")

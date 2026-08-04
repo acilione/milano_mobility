@@ -1,5 +1,39 @@
 name: ${COMPOSE_PROJECT_NAME:-milano-mobility}
 
+x-runtime-environment: &runtime-environment
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: ${POSTGRES_DB:-mobility}
+  INGESTION_DB_USER: ${INGESTION_DB_USER:-ingestion_writer}
+  INGESTION_DB_PASSWORD: ${INGESTION_DB_PASSWORD:-ingestion_dev}
+  TRANSFORMER_DB_USER: ${TRANSFORMER_DB_USER:-transformer}
+  TRANSFORMER_DB_PASSWORD: ${TRANSFORMER_DB_PASSWORD:-transformer_dev}
+  BI_DB_USER: ${BI_DB_USER:-bi_reader}
+  BI_DB_PASSWORD: ${BI_DB_PASSWORD:-bi_reader_dev}
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
+  S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_dev_password}
+  S3_RAW_BUCKET: ${S3_RAW_BUCKET:-raw}
+  S3_QUARANTINE_BUCKET: ${S3_QUARANTINE_BUCKET:-quarantine}
+  S3_CURATED_BUCKET: ${S3_CURATED_BUCKET:-curated}
+  GTFS_SOURCE_URL: ${GTFS_SOURCE_URL:-https://dati.comune.milano.it/gtfs.zip}
+  GTFS_SOURCE_NAME: ${GTFS_SOURCE_NAME:-comune_milano_official_gtfs}
+  GTFS_SOURCE_LABEL: ${GTFS_SOURCE_LABEL:-Comune di Milano / AMAT}
+  GTFS_LICENSE: ${GTFS_LICENSE:-CC BY 4.0}
+  GTFS_REQUEST_TIMEOUT_SECONDS: ${GTFS_REQUEST_TIMEOUT_SECONDS:-120}
+  SERVICE_AREA_ID: ${SERVICE_AREA_ID:-milano}
+  SERVICE_AREA_NAME: ${SERVICE_AREA_NAME:-Milan}
+  SERVICE_AREA_LATITUDE: ${SERVICE_AREA_LATITUDE:-45.4642}
+  SERVICE_AREA_LONGITUDE: ${SERVICE_AREA_LONGITUDE:-9.1900}
+  SERVICE_TIMEZONE: ${SERVICE_TIMEZONE:-Europe/Rome}
+  WEATHER_API_URL: ${WEATHER_API_URL:-https://archive-api.open-meteo.com/v1/archive}
+  DASHBOARD_TITLE: ${DASHBOARD_TITLE:-Milano Mobility Observatory}
+  DASHBOARD_REFRESH_SECONDS: ${DASHBOARD_REFRESH_SECONDS:-30}
+  DBT_PROJECT_DIR: /workspace/transformations/dbt
+  DBT_PROFILES_DIR: /workspace/transformations/dbt
+  DBT_THREADS: ${DBT_THREADS:-1}
+  DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+
 x-airflow-common: &airflow-common
   build:
     context: .
@@ -7,35 +41,17 @@ x-airflow-common: &airflow-common
     args:
       PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
   environment: &airflow-environment
+    <<: *runtime-environment
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    AIRFLOW__CORE__DEFAULT_TIMEZONE: Europe/Rome
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: ${SERVICE_TIMEZONE:-Europe/Rome}
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow_dev}@postgres:5432/airflow
     AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-local-development-only}
     AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
-    POSTGRES_HOST: postgres
-    POSTGRES_PORT: 5432
-    POSTGRES_DB: ${POSTGRES_DB:-mobility}
-    INGESTION_DB_USER: ${INGESTION_DB_USER:-ingestion_writer}
-    INGESTION_DB_PASSWORD: ${INGESTION_DB_PASSWORD:-ingestion_dev}
-    TRANSFORMER_DB_USER: ${TRANSFORMER_DB_USER:-transformer}
-    TRANSFORMER_DB_PASSWORD: ${TRANSFORMER_DB_PASSWORD:-transformer_dev}
-    S3_ENDPOINT_URL: http://minio:9000
-    S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
-    S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_dev_password}
-    S3_RAW_BUCKET: raw
-    S3_QUARANTINE_BUCKET: quarantine
-    S3_CURATED_BUCKET: curated
-    GTFS_SOURCE_URL: ${GTFS_SOURCE_URL:-https://dati.comune.milano.it/gtfs.zip}
-    GTFS_SOURCE_NAME: ${GTFS_SOURCE_NAME:-comune_milano_official_gtfs}
-    GTFS_REQUEST_TIMEOUT_SECONDS: ${GTFS_REQUEST_TIMEOUT_SECONDS:-120}
-    SERVICE_AREA_ID: ${SERVICE_AREA_ID:-milano}
-    SERVICE_AREA_LATITUDE: ${SERVICE_AREA_LATITUDE:-45.4642}
-    SERVICE_AREA_LONGITUDE: ${SERVICE_AREA_LONGITUDE:-9.1900}
-    DBT_PROJECT_DIR: /workspace/transformations/dbt
-    DBT_PROFILES_DIR: /workspace/transformations/dbt
-    DBT_THREADS: ${DBT_THREADS:-1}
-    DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    AIRFLOW_DAG_START_DATE: ${AIRFLOW_DAG_START_DATE:-2024-01-01}
+    GTFS_INGESTION_SCHEDULE: ${GTFS_INGESTION_SCHEDULE:-0 6 * * *}
+    WEATHER_BACKFILL_SCHEDULE: ${WEATHER_BACKFILL_SCHEDULE:-0 7 * * *}
+    DATA_QUALITY_SCHEDULE: ${DATA_QUALITY_SCHEDULE:-0 8 * * *}
   volumes:
     - ./orchestration/dags:/opt/airflow/dags:ro
     - ./transformations:/workspace/transformations:ro
@@ -56,27 +72,7 @@ x-pipeline-common: &pipeline-common
     args:
       PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
   environment:
-    POSTGRES_HOST: postgres
-    POSTGRES_PORT: 5432
-    POSTGRES_DB: ${POSTGRES_DB:-mobility}
-    INGESTION_DB_USER: ${INGESTION_DB_USER:-ingestion_writer}
-    INGESTION_DB_PASSWORD: ${INGESTION_DB_PASSWORD:-ingestion_dev}
-    TRANSFORMER_DB_USER: ${TRANSFORMER_DB_USER:-transformer}
-    TRANSFORMER_DB_PASSWORD: ${TRANSFORMER_DB_PASSWORD:-transformer_dev}
-    BI_DB_USER: ${BI_DB_USER:-bi_reader}
-    BI_DB_PASSWORD: ${BI_DB_PASSWORD:-bi_reader_dev}
-    S3_ENDPOINT_URL: http://minio:9000
-    S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
-    S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_dev_password}
-    GTFS_SOURCE_URL: ${GTFS_SOURCE_URL:-https://dati.comune.milano.it/gtfs.zip}
-    GTFS_SOURCE_NAME: ${GTFS_SOURCE_NAME:-comune_milano_official_gtfs}
-    GTFS_REQUEST_TIMEOUT_SECONDS: ${GTFS_REQUEST_TIMEOUT_SECONDS:-120}
-    SERVICE_AREA_ID: ${SERVICE_AREA_ID:-milano}
-    SERVICE_AREA_LATITUDE: ${SERVICE_AREA_LATITUDE:-45.4642}
-    SERVICE_AREA_LONGITUDE: ${SERVICE_AREA_LONGITUDE:-9.1900}
-    DBT_PROJECT_DIR: /workspace/transformations/dbt
-    DBT_THREADS: ${DBT_THREADS:-1}
-    DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    <<: *runtime-environment
   volumes:
     - ./:/workspace
   depends_on:
@@ -103,7 +99,7 @@ services:
       METABASE_DB_USER: ${METABASE_DB_USER:-metabase}
       METABASE_DB_PASSWORD: ${METABASE_DB_PASSWORD:-metabase_dev}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infrastructure/postgres/init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
@@ -123,8 +119,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_dev_password}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -142,10 +138,10 @@ services:
       - >
         mc alias set local http://minio:9000
         "${MINIO_ROOT_USER:-minio}" "${MINIO_ROOT_PASSWORD:-minio_dev_password}" &&
-        mc mb --ignore-existing local/raw &&
-        mc mb --ignore-existing local/quarantine &&
-        mc mb --ignore-existing local/curated &&
-        mc version enable local/raw
+        mc mb --ignore-existing local/${S3_RAW_BUCKET:-raw} &&
+        mc mb --ignore-existing local/${S3_QUARANTINE_BUCKET:-quarantine} &&
+        mc mb --ignore-existing local/${S3_CURATED_BUCKET:-curated} &&
+        mc version enable local/${S3_RAW_BUCKET:-raw}
     depends_on:
       minio:
         condition: service_healthy
@@ -172,7 +168,7 @@ services:
     <<: *airflow-common
     command: webserver
     ports:
-      - "8080:8080"
+      - "${AIRFLOW_HOST_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 10s
@@ -206,7 +202,7 @@ services:
       MB_DB_PASS: ${METABASE_DB_PASSWORD:-metabase_dev}
       MB_DB_HOST: postgres
     ports:
-      - "3000:3000"
+      - "${METABASE_HOST_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -226,7 +222,7 @@ services:
     entrypoint: ["python", "-m", "milano_mobility.web"]
     command: []
     ports:
-      - "8501:8501"
+      - "${DASHBOARD_HOST_PORT:-8501}:8501"
     healthcheck:
       test:
         - CMD

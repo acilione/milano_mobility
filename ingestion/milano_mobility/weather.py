@@ -13,8 +13,6 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 from milano_mobility.config import Settings
 from milano_mobility.storage import ObjectStore
 
-ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
-
 
 class WeatherContractError(ValueError):
     """Raised when a weather provider response violates the expected contract."""
@@ -32,16 +30,18 @@ def fetch_weather(
     """Fetch and normalize daily Open-Meteo observations."""
     if date_from > date_to:
         raise ValueError("date_from must not be after date_to")
+    if not settings.weather_api_url:
+        raise ValueError("WEATHER_API_URL must be configured before fetching weather data")
     parameters: dict[str, str | float] = {
         "latitude": settings.service_area_latitude,
         "longitude": settings.service_area_longitude,
         "start_date": date_from.isoformat(),
         "end_date": date_to.isoformat(),
         "daily": "temperature_2m_min,temperature_2m_max,precipitation_sum,weather_code",
-        "timezone": "Europe/Rome",
+        "timezone": settings.service_timezone,
     }
     response = requests.get(
-        ARCHIVE_URL,
+        settings.weather_api_url,
         params=parameters,
         timeout=settings.request_timeout_seconds,
     )

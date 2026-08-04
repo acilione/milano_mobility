@@ -31,7 +31,7 @@ rules are expanded and then adjusted by `calendar_dates.txt` additions and remov
 ### `marts.dim_date`
 
 One date between the first and last active service day. `date_key` uses `YYYYMMDD`.
-Includes ISO weekday, weekend flag, holiday metadata, and meteorological season.
+Includes ISO weekday, weekend flag, and meteorological season.
 
 ### `marts.dim_weather_day`
 

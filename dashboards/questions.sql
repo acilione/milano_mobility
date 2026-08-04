@@ -34,12 +34,11 @@ order by 1, 2, 3;
 select
     date.date,
     date.weekday_name,
-    date.is_holiday,
     weather.temperature_max_c,
     weather.precipitation_mm,
     coalesce(sum(activity.scheduled_trips), 0) as scheduled_trips
 from marts.dim_date as date
 left join marts.dim_weather_day as weather using (date_key)
 left join marts.dashboard_service_activity as activity using (date_key)
-group by 1, 2, 3, 4, 5
+group by 1, 2, 3, 4
 order by 1;
