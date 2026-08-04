@@ -3,10 +3,7 @@ SHELL := /bin/bash
 
 PYTHON ?= python3
 COMPOSE := docker compose
-FIXTURE ?= tests/fixtures/gtfs_v1.zip
-SNAPSHOT_DATE ?= 2026-07-28
-
-.PHONY: help install quality test integration up down reset wait demo demo-second dbt docs logs quickstart
+.PHONY: help install quality test integration up down reset wait demo dbt docs logs quickstart
 
 help: ## Show available commands.
 	@awk 'BEGIN {FS = ":.*## "; printf "Milano Mobility commands:\n"} /^[a-zA-Z_-]+:.*## / {printf "  %-16s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -45,11 +42,8 @@ reset: ## Remove local containers and volumes, then rebuild the stack.
 	$(COMPOSE) down --volumes --remove-orphans
 	$(COMPOSE) up -d --build
 
-demo: ## Load the first deterministic GTFS snapshot and build the warehouse.
-	$(COMPOSE) run --rm pipeline run --feed /workspace/$(FIXTURE) --snapshot-date $(SNAPSHOT_DATE) --build
-
-demo-second: ## Load the changed fixture to demonstrate SCD history and network diffs.
-	$(COMPOSE) run --rm pipeline run --feed /workspace/tests/fixtures/gtfs_v2.zip --snapshot-date 2026-08-04 --build
+demo: ## Download the complete official Milan GTFS feed and build the warehouse.
+	$(COMPOSE) --profile demo run --build --rm demo
 
 dbt: ## Build and test all dbt models.
 	$(COMPOSE) run --rm --entrypoint dbt pipeline build --project-dir /workspace/transformations/dbt --profiles-dir /workspace/transformations/dbt

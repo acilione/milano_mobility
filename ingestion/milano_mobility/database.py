@@ -185,24 +185,21 @@ class Database:
         with psycopg.connect(self._dsn) as connection:
             for table, columns in TABLE_COLUMNS.items():
                 filename = f"{table}.txt"
-                rows = list(iter_gtfs_rows(feed_path, filename))
-                counts[table] = len(rows)
                 connection.execute(
                     sql.SQL("DELETE FROM staging.{} WHERE source_snapshot_date = %s").format(
                         sql.Identifier(table)
                     ),
                     (snapshot_date,),
                 )
-                if not rows:
-                    continue
                 audit_columns = ("source_snapshot_date", "pipeline_run_id", "loaded_at")
                 copy_columns = (*columns, "entity_hash", *audit_columns)
                 statement = sql.SQL("COPY staging.{} ({}) FROM STDIN").format(
                     sql.Identifier(table),
                     sql.SQL(", ").join(map(sql.Identifier, copy_columns)),
                 )
+                row_count = 0
                 with connection.cursor().copy(statement) as copy:
-                    for row in rows:
+                    for row in iter_gtfs_rows(feed_path, filename):
                         transformed = _transform_row(table, row, columns)
                         values = [transformed.get(column) for column in columns]
                         copy.write_row(
@@ -214,6 +211,14 @@ class Database:
                                 "now",
                             )
                         )
+                        row_count += 1
+                counts[table] = row_count
+        # PostgreSQL's automatic statistics collection can start after dbt has already
+        # planned its first joins on a newly loaded multi-million-row feed. Collecting
+        # statistics synchronously keeps the one-command build predictable.
+        with psycopg.connect(self._dsn) as connection:
+            for table in TABLE_COLUMNS:
+                connection.execute(sql.SQL("ANALYZE staging.{}").format(sql.Identifier(table)))
         return counts
 
 

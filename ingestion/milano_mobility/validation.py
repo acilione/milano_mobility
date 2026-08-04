@@ -9,11 +9,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from milano_mobility.gtfs import (
     REQUIRED_FILES,
+    SUPPORTED_FILES,
     GTFSError,
     archive_members,
+    gtfs_headers,
+    iter_gtfs_rows,
     parse_gtfs_date,
     parse_gtfs_time,
-    read_gtfs_tables,
 )
 from milano_mobility.models import Severity, ValidationIssue, ValidationReport
 
@@ -72,7 +74,7 @@ def validate_feed(
     snapshot_date: date,
     invalid_coordinate_threshold: float = 0.005,
 ) -> ValidationReport:
-    """Validate a GTFS feed and return every detected issue."""
+    """Validate a GTFS feed with bounded memory and return every detected issue."""
     report = ValidationReport(pipeline_run_id=pipeline_run_id, source_snapshot_date=snapshot_date)
     try:
         members = archive_members(path)
@@ -102,30 +104,90 @@ def validate_feed(
         )
 
     try:
-        tables = read_gtfs_tables(path)
+        for filename, required_headers in HEADERS.items():
+            if filename not in members:
+                continue
+            actual_headers = set(gtfs_headers(path, filename))
+            missing_headers = sorted(required_headers - actual_headers)
+            if missing_headers:
+                report.issues.append(
+                    ValidationIssue(
+                        "required_columns",
+                        Severity.CRITICAL,
+                        f"{filename} is missing columns: {', '.join(missing_headers)}",
+                        table=filename,
+                        count=len(missing_headers),
+                        sample=missing_headers,
+                    )
+                )
     except (GTFSError, UnicodeDecodeError) as error:
         report.issues.append(ValidationIssue("parseable_files", Severity.CRITICAL, str(error)))
         return report
 
-    report.row_counts = {name.removesuffix(".txt"): len(rows) for name, rows in tables.items()}
-    for filename, required_headers in HEADERS.items():
-        if filename not in tables:
-            continue
-        actual_headers = set(tables[filename][0]) if tables[filename] else set()
-        missing_headers = sorted(required_headers - actual_headers)
-        if missing_headers:
-            report.issues.append(
-                ValidationIssue(
-                    "required_columns",
-                    Severity.CRITICAL,
-                    f"{filename} is missing columns: {', '.join(missing_headers)}",
-                    table=filename,
-                    count=len(missing_headers),
-                    sample=missing_headers,
-                )
-            )
+    materialized_files = (
+        "agency.txt",
+        "stops.txt",
+        "routes.txt",
+        "calendar.txt",
+        "calendar_dates.txt",
+    )
+    try:
+        tables = {
+            filename: list(iter_gtfs_rows(path, filename))
+            for filename in materialized_files
+            if filename in members
+        }
+    except (GTFSError, UnicodeDecodeError) as error:
+        report.issues.append(ValidationIssue("parseable_files", Severity.CRITICAL, str(error)))
+        return report
 
+    for filename, rows in tables.items():
+        report.row_counts[filename.removesuffix(".txt")] = len(rows)
+    for filename in SUPPORTED_FILES:
+        if filename in members:
+            report.row_counts.setdefault(filename.removesuffix(".txt"), 0)
+
+    _validate_primary_keys(tables, report)
+    _validate_agencies(tables.get("agency.txt", []), report)
+    _validate_stops(tables.get("stops.txt", []), report, invalid_coordinate_threshold)
+    _validate_routes(tables.get("routes.txt", []), report)
+    _validate_calendars(tables, report)
+
+    agencies = {row.get("agency_id", "") for row in tables.get("agency.txt", [])}
+    route_rows = tables.get("routes.txt", [])
+    if not (len(agencies) == 1 and all(not row.get("agency_id") for row in route_rows)):
+        _append_missing_references(
+            report,
+            "routes.txt",
+            "agency_id",
+            _missing_references(route_rows, "agency_id", agencies),
+        )
+    routes = {row.get("route_id", "") for row in route_rows}
+    services = {
+        row.get("service_id", "")
+        for filename in ("calendar.txt", "calendar_dates.txt")
+        for row in tables.get(filename, [])
+    }
+
+    try:
+        trip_ordinals = _stream_trips(path, routes, services, report)
+        _stream_stop_times(
+            path,
+            trip_ordinals,
+            {row.get("stop_id", "") for row in tables.get("stops.txt", [])},
+            report,
+        )
+    except (GTFSError, UnicodeDecodeError) as error:
+        report.issues.append(ValidationIssue("parseable_files", Severity.CRITICAL, str(error)))
+    return report
+
+
+def _validate_primary_keys(
+    tables: dict[str, list[dict[str, str]]], report: ValidationReport
+) -> None:
     for filename, keys in PRIMARY_KEYS.items():
+        if filename in {"trips.txt", "stop_times.txt"}:
+            continue
         rows = tables.get(filename)
         if rows is None:
             continue
@@ -160,13 +222,199 @@ def validate_feed(
                 )
             )
 
-    _validate_references(tables, report)
-    _validate_agencies(tables.get("agency.txt", []), report)
-    _validate_stops(tables.get("stops.txt", []), report, invalid_coordinate_threshold)
-    _validate_stop_times(tables.get("stop_times.txt", []), report)
-    _validate_routes(tables.get("routes.txt", []), report)
-    _validate_calendars(tables, report)
-    return report
+
+def _stream_trips(
+    path: Path,
+    valid_routes: set[str],
+    valid_services: set[str],
+    report: ValidationReport,
+) -> dict[str, int]:
+    trip_ordinals: dict[str, int] = {}
+    null_keys: list[str] = []
+    null_key_count = 0
+    duplicate_keys: list[str] = []
+    duplicate_count = 0
+    missing_routes: set[str] = set()
+    missing_services: set[str] = set()
+    row_count = 0
+    for row in iter_gtfs_rows(path, "trips.txt"):
+        row_count += 1
+        trip_id = row.get("trip_id", "")
+        if not trip_id:
+            null_key_count += 1
+            if len(null_keys) < 10:
+                null_keys.append(trip_id)
+        elif trip_id in trip_ordinals:
+            duplicate_count += 1
+            if len(duplicate_keys) < 10:
+                duplicate_keys.append(trip_id)
+        else:
+            trip_ordinals[trip_id] = len(trip_ordinals)
+        route_id = row.get("route_id", "")
+        service_id = row.get("service_id", "")
+        if route_id not in valid_routes:
+            missing_routes.add(route_id)
+        if service_id not in valid_services:
+            missing_services.add(service_id)
+    report.row_counts["trips"] = row_count
+    if null_key_count:
+        report.issues.append(
+            ValidationIssue(
+                "non_null_primary_key",
+                Severity.CRITICAL,
+                "trips.txt contains null logical keys.",
+                "trips.txt",
+                null_key_count,
+                null_keys,
+            )
+        )
+    if duplicate_count:
+        report.issues.append(
+            ValidationIssue(
+                "unique_primary_key",
+                Severity.CRITICAL,
+                "trips.txt contains duplicate logical keys.",
+                "trips.txt",
+                duplicate_count,
+                duplicate_keys,
+            )
+        )
+    _append_missing_references(report, "trips.txt", "route_id", missing_routes)
+    _append_missing_references(report, "trips.txt", "service_id", missing_services)
+    return trip_ordinals
+
+
+def _stream_stop_times(
+    path: Path,
+    trip_ordinals: dict[str, int],
+    valid_stops: set[str],
+    report: ValidationReport,
+) -> None:
+    unknown_trip_ordinals: dict[str, int] = {}
+    seen_keys: set[int] = set()
+    missing_trips: set[str] = set()
+    missing_stops: set[str] = set()
+    null_keys: list[str] = []
+    null_key_count = 0
+    duplicate_keys: list[str] = []
+    duplicate_count = 0
+    invalid_times: list[str] = []
+    invalid_time_count = 0
+    invalid_sequences: list[str] = []
+    invalid_sequence_count = 0
+    row_count = 0
+    for row in iter_gtfs_rows(path, "stop_times.txt"):
+        row_count += 1
+        trip_id = row.get("trip_id", "")
+        sequence_text = row.get("stop_sequence", "")
+        key_text = f"{trip_id}|{sequence_text}"
+        if not trip_id or not sequence_text:
+            null_key_count += 1
+        if (not trip_id or not sequence_text) and len(null_keys) < 10:
+            null_keys.append(key_text)
+
+        ordinal = trip_ordinals.get(trip_id)
+        if ordinal is None:
+            missing_trips.add(trip_id)
+            ordinal = unknown_trip_ordinals.setdefault(
+                trip_id, len(trip_ordinals) + len(unknown_trip_ordinals)
+            )
+        stop_id = row.get("stop_id", "")
+        if stop_id not in valid_stops:
+            missing_stops.add(stop_id)
+
+        try:
+            parse_gtfs_time(row.get("arrival_time", ""))
+            parse_gtfs_time(row.get("departure_time", ""))
+        except GTFSError:
+            invalid_time_count += 1
+            if len(invalid_times) < 10:
+                invalid_times.append(key_text)
+
+        try:
+            sequence = int(sequence_text)
+            if sequence < 0:
+                invalid_sequence_count += 1
+            if sequence < 0 and len(invalid_sequences) < 10:
+                invalid_sequences.append(key_text)
+            if sequence >= 0:
+                pair_sum = ordinal + sequence
+                encoded_key = pair_sum * (pair_sum + 1) // 2 + sequence
+                if encoded_key in seen_keys:
+                    duplicate_count += 1
+                    if len(duplicate_keys) < 10:
+                        duplicate_keys.append(key_text)
+                else:
+                    seen_keys.add(encoded_key)
+        except ValueError:
+            invalid_sequence_count += 1
+            if len(invalid_sequences) < 10:
+                invalid_sequences.append(key_text)
+
+    report.row_counts["stop_times"] = row_count
+    if null_key_count:
+        report.issues.append(
+            ValidationIssue(
+                "non_null_primary_key",
+                Severity.CRITICAL,
+                "stop_times.txt contains null logical keys.",
+                "stop_times.txt",
+                null_key_count,
+                null_keys,
+            )
+        )
+    if duplicate_count:
+        report.issues.append(
+            ValidationIssue(
+                "unique_primary_key",
+                Severity.CRITICAL,
+                "stop_times.txt contains duplicate logical keys.",
+                "stop_times.txt",
+                duplicate_count,
+                duplicate_keys,
+            )
+        )
+    _append_missing_references(report, "stop_times.txt", "trip_id", missing_trips)
+    _append_missing_references(report, "stop_times.txt", "stop_id", missing_stops)
+    if invalid_time_count:
+        report.issues.append(
+            ValidationIssue(
+                "parseable_stop_times",
+                Severity.CRITICAL,
+                "Arrival and departure times must be valid GTFS times.",
+                "stop_times.txt",
+                invalid_time_count,
+                invalid_times,
+            )
+        )
+    if invalid_sequence_count:
+        report.issues.append(
+            ValidationIssue(
+                "valid_stop_sequence",
+                Severity.HIGH,
+                "stop_sequence must be a non-negative integer.",
+                "stop_times.txt",
+                invalid_sequence_count,
+                invalid_sequences,
+            )
+        )
+
+
+def _append_missing_references(
+    report: ValidationReport, filename: str, field: str, missing: set[str] | list[str]
+) -> None:
+    if missing:
+        values = sorted(missing)
+        report.issues.append(
+            ValidationIssue(
+                f"foreign_key_{field}",
+                Severity.CRITICAL,
+                f"{filename}.{field} contains unresolved references.",
+                filename,
+                len(values),
+                values[:10],
+            )
+        )
 
 
 def _validate_agencies(rows: list[dict[str, str]], report: ValidationReport) -> None:
@@ -187,40 +435,6 @@ def _validate_agencies(rows: list[dict[str, str]], report: ValidationReport) -> 
                 invalid[:10],
             )
         )
-
-
-def _validate_references(tables: dict[str, list[dict[str, str]]], report: ValidationReport) -> None:
-    agencies = {row.get("agency_id", "") for row in tables.get("agency.txt", [])}
-    routes = {row.get("route_id", "") for row in tables.get("routes.txt", [])}
-    trips = {row.get("trip_id", "") for row in tables.get("trips.txt", [])}
-    stops = {row.get("stop_id", "") for row in tables.get("stops.txt", [])}
-    services = {
-        row.get("service_id", "")
-        for filename in ("calendar.txt", "calendar_dates.txt")
-        for row in tables.get(filename, [])
-    }
-    checks = [
-        ("routes.txt", "agency_id", agencies, tables.get("routes.txt", [])),
-        ("trips.txt", "route_id", routes, tables.get("trips.txt", [])),
-        ("trips.txt", "service_id", services, tables.get("trips.txt", [])),
-        ("stop_times.txt", "trip_id", trips, tables.get("stop_times.txt", [])),
-        ("stop_times.txt", "stop_id", stops, tables.get("stop_times.txt", [])),
-    ]
-    for filename, field, valid, rows in checks:
-        if field == "agency_id" and all(not row.get(field) for row in rows) and len(agencies) == 1:
-            continue
-        missing = _missing_references(rows, field, valid)
-        if missing:
-            report.issues.append(
-                ValidationIssue(
-                    f"foreign_key_{field}",
-                    Severity.CRITICAL,
-                    f"{filename}.{field} contains unresolved references.",
-                    filename,
-                    len(missing),
-                    missing[:10],
-                )
-            )
 
 
 def _validate_stops(rows: list[dict[str, str]], report: ValidationReport, threshold: float) -> None:
@@ -259,49 +473,6 @@ def _validate_stops(rows: list[dict[str, str]], report: ValidationReport, thresh
                 "stops.txt",
                 len(invalid),
                 invalid[:10],
-            )
-        )
-
-
-def _validate_stop_times(rows: list[dict[str, str]], report: ValidationReport) -> None:
-    invalid_times: list[str] = []
-    invalid_sequences: list[str] = []
-    last_sequence: dict[str, int] = {}
-    for row in rows:
-        key = f"{row.get('trip_id', '')}|{row.get('stop_sequence', '')}"
-        try:
-            parse_gtfs_time(row.get("arrival_time", ""))
-            parse_gtfs_time(row.get("departure_time", ""))
-        except GTFSError:
-            invalid_times.append(key)
-        try:
-            sequence = int(row.get("stop_sequence", ""))
-            trip_id = row.get("trip_id", "")
-            if sequence <= last_sequence.get(trip_id, -1):
-                invalid_sequences.append(key)
-            last_sequence[trip_id] = sequence
-        except ValueError:
-            invalid_sequences.append(key)
-    if invalid_times:
-        report.issues.append(
-            ValidationIssue(
-                "parseable_stop_times",
-                Severity.CRITICAL,
-                "Arrival and departure times must be valid GTFS times.",
-                "stop_times.txt",
-                len(invalid_times),
-                invalid_times[:10],
-            )
-        )
-    if invalid_sequences:
-        report.issues.append(
-            ValidationIssue(
-                "increasing_stop_sequence",
-                Severity.HIGH,
-                "stop_sequence must increase within each trip.",
-                "stop_times.txt",
-                len(invalid_sequences),
-                invalid_sequences[:10],
             )
         )
 

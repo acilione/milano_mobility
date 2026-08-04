@@ -43,26 +43,34 @@ models:
         tests: [not_null]
 
   - name: fact_scheduled_trip
-    description: One scheduled trip for a snapshot and service date.
+    description: >-
+      Complete logical scheduled-trip fact exposed as a view. Its source keys,
+      references, and accepted values are enforced during streaming ingestion and on
+      the underlying staging and dimension models, avoiding repeated full-calendar
+      expansion merely to test the view.
+
+  - name: fact_stop_event
+    description: >-
+      Complete logical scheduled-call fact exposed as a view so the official feed does
+      not duplicate tens of millions of service-day-expanded rows on a laptop.
+
+  - name: dashboard_service_activity
+    description: Compact daily, hourly, and route-level scheduled-trip aggregate.
     columns:
-      - name: scheduled_trip_sk
+      - name: service_activity_sk
         tests: [not_null, unique]
       - name: route_sk
         tests:
           - relationships:
               to: ref('dim_route')
               field: route_sk
-      - name: direction_id
-        tests:
-          - accepted_values:
-              values: [0, 1]
-              config:
-                where: "direction_id is not null"
+      - name: scheduled_trips
+        tests: [not_null]
 
-  - name: fact_stop_event
-    description: One scheduled call at a stop for a trip and service date.
+  - name: dashboard_stop_activity
+    description: Compact route-and-stop aggregate across each snapshot service window.
     columns:
-      - name: stop_event_sk
+      - name: stop_activity_sk
         tests: [not_null, unique]
       - name: route_sk
         tests:
@@ -74,11 +82,8 @@ models:
           - relationships:
               to: ref('dim_stop')
               field: stop_sk
-      - name: date_key
-        tests:
-          - relationships:
-              to: ref('dim_date')
-              field: date_key
+      - name: stop_events
+        tests: [not_null]
 
   - name: fact_network_change
     description: Added, removed, and modified entities between consecutive snapshots.

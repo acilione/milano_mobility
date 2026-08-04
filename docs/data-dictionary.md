@@ -41,12 +41,27 @@ Weather code follows the source provider contract.
 ### `marts.fact_scheduled_trip`
 
 One `snapshot_date + service_date + trip_id`. Includes the historical route surrogate,
-direction, and first-stop departure in service-day seconds.
+direction, and first-stop departure in service-day seconds. This complete logical fact is
+exposed as a view so official service-day expansion is not duplicated on local disk.
 
 ### `marts.fact_stop_event`
 
 One `snapshot_date + service_date + trip_id + stop_sequence`. Arrival and departure are
-integer seconds after the start of the service day and may exceed 86,400.
+integer seconds after the start of the service day and may exceed 86,400. This is also a
+complete logical view; it is not a sample or row-limited model.
+
+### `marts.dashboard_service_activity`
+
+One `snapshot_date + service_date + service_hour + route_sk`. `scheduled_trips` is the
+number of first-stop departures in the bucket. Service hours can exceed 23 for trips
+after midnight belonging to the previous GTFS service day.
+
+### `marts.dashboard_stop_activity`
+
+One `snapshot_date + route_sk + stop_sk`. `stop_events` is the full count of scheduled
+calls across the snapshot's active service window. The model weights each source stop
+call by its service's active-day count, producing the same total as the logical stop-event
+fact without first materializing every service-day row.
 
 ### `marts.fact_network_change`
 

@@ -9,9 +9,10 @@ measures scheduled supply, not real-time punctuality.
 ## 1:00–2:00 — Start and ingest
 
 Run `docker compose --profile demo run --build --rm demo`. Show the final `PUBLISHED`
-result, then open the visual dashboard at <http://localhost:8501>. Use the KPI cards,
-service trend, and stop constellation to establish the analytical product before showing
-the immutable ZIP and manifest in the MinIO raw bucket.
+result and complete official source row counts, then open the visual dashboard at
+<http://localhost:8501>. Use the 166-route coverage list, 4,909-point stop constellation,
+and service trend to establish the analytical product before showing the immutable ZIP,
+SHA-256 digest, and manifest in the MinIO raw bucket.
 
 ## 2:00–3:00 — Quality and lineage
 
@@ -25,9 +26,10 @@ Run the first query from `dashboards/questions.sql`. Highlight service-hour valu
 
 ## 4:00–5:15 — Network history
 
-Run `make demo-second`. Query `marts.dim_stop` for `S2` to show its closed and current
-type-2 versions. Query `marts.fact_network_change` to show added, removed, and modified
-entities with old/new hashes.
+Filter route coverage to metro and point out all five official lines, then compare tram
+and bus coverage. Explain that rerunning after Comune di Milano publishes a changed feed
+creates the next immutable snapshot. Query `marts.fact_network_change` to show the
+auditable entity hashes used for added, removed, and modified events.
 
 ## 5:15–6:15 — Dashboard and operations
 

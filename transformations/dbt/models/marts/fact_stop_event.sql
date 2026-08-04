@@ -1,3 +1,5 @@
+{{ config(materialized='view') }}
+
 select
     md5(
         stop_times.source_snapshot_date::text || '|' || service.service_date::text || '|'

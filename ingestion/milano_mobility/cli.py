@@ -5,8 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from milano_mobility.models import ManifestStatus
 from milano_mobility.validation import validate_feed
@@ -19,6 +20,10 @@ def _date(value: str) -> date:
         raise argparse.ArgumentTypeError("Date must use YYYY-MM-DD format") from error
 
 
+def _milan_today() -> date:
+    return datetime.now(ZoneInfo("Europe/Rome")).date()
+
+
 def parser() -> argparse.ArgumentParser:
     """Build the public CLI parser."""
     root = argparse.ArgumentParser(
@@ -28,7 +33,12 @@ def parser() -> argparse.ArgumentParser:
 
     run = commands.add_parser("run", help="Ingest and optionally publish one GTFS feed")
     run.add_argument("--feed", required=True, help="Local ZIP path or HTTP(S) URL")
-    run.add_argument("--snapshot-date", required=True, type=_date)
+    run.add_argument(
+        "--snapshot-date",
+        type=_date,
+        default=_milan_today(),
+        help="Acquisition date in YYYY-MM-DD format (defaults to today)",
+    )
     run.add_argument("--pipeline-run-id")
     run.add_argument("--build", action="store_true", help="Run dbt after a valid load")
 

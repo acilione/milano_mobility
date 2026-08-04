@@ -1,2 +1,8 @@
 route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_color,route_text_color
 R1,ATM,M1,Sesto 1 Maggio FS - Rho Fieramilano/Bisceglie,Red metro line,1,E51B23,FFFFFF
+R2,ATM,M2,Assago Milanofiori Forum - Cologno Nord/Gessate,Green metro line,1,009D58,FFFFFF
+R3,ATM,M3,Comasina - San Donato,Yellow metro line,1,FFD500,111111
+R4,ATM,M4,San Cristoforo - Linate Aeroporto,Blue metro line,1,0072CE,FFFFFF
+R5,ATM,M5,San Siro Stadio - Bignami,Lilac metro line,1,8A2BE2,FFFFFF
+R6,ATM,1,Greco - Roserio,Historic tram line,0,F28C28,111111
+R7,ATM,90,External circular line,Night and orbital trolleybus,3,5B9BD5,FFFFFF

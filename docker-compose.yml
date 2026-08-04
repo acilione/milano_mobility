@@ -26,13 +26,16 @@ x-airflow-common: &airflow-common
     S3_RAW_BUCKET: raw
     S3_QUARANTINE_BUCKET: quarantine
     S3_CURATED_BUCKET: curated
-    GTFS_SOURCE_URL: ${GTFS_SOURCE_URL:-}
-    GTFS_SOURCE_NAME: ${GTFS_SOURCE_NAME:-milano_gtfs}
+    GTFS_SOURCE_URL: ${GTFS_SOURCE_URL:-https://dati.comune.milano.it/gtfs.zip}
+    GTFS_SOURCE_NAME: ${GTFS_SOURCE_NAME:-comune_milano_official_gtfs}
+    GTFS_REQUEST_TIMEOUT_SECONDS: ${GTFS_REQUEST_TIMEOUT_SECONDS:-120}
     SERVICE_AREA_ID: ${SERVICE_AREA_ID:-milano}
     SERVICE_AREA_LATITUDE: ${SERVICE_AREA_LATITUDE:-45.4642}
     SERVICE_AREA_LONGITUDE: ${SERVICE_AREA_LONGITUDE:-9.1900}
     DBT_PROJECT_DIR: /workspace/transformations/dbt
     DBT_PROFILES_DIR: /workspace/transformations/dbt
+    DBT_THREADS: ${DBT_THREADS:-1}
+    DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
   volumes:
     - ./orchestration/dags:/opt/airflow/dags:ro
     - ./transformations:/workspace/transformations:ro
@@ -65,10 +68,15 @@ x-pipeline-common: &pipeline-common
     S3_ENDPOINT_URL: http://minio:9000
     S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minio}
     S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_dev_password}
+    GTFS_SOURCE_URL: ${GTFS_SOURCE_URL:-https://dati.comune.milano.it/gtfs.zip}
+    GTFS_SOURCE_NAME: ${GTFS_SOURCE_NAME:-comune_milano_official_gtfs}
+    GTFS_REQUEST_TIMEOUT_SECONDS: ${GTFS_REQUEST_TIMEOUT_SECONDS:-120}
     SERVICE_AREA_ID: ${SERVICE_AREA_ID:-milano}
     SERVICE_AREA_LATITUDE: ${SERVICE_AREA_LATITUDE:-45.4642}
     SERVICE_AREA_LONGITUDE: ${SERVICE_AREA_LONGITUDE:-9.1900}
     DBT_PROJECT_DIR: /workspace/transformations/dbt
+    DBT_THREADS: ${DBT_THREADS:-1}
+    DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
   volumes:
     - ./:/workspace
   depends_on:
@@ -236,9 +244,7 @@ services:
     command:
       - run
       - --feed
-      - /workspace/tests/fixtures/gtfs_v1.zip
-      - --snapshot-date
-      - "2026-07-28"
+      - ${GTFS_SOURCE_URL:-https://dati.comune.milano.it/gtfs.zip}
       - --build
     depends_on:
       postgres:

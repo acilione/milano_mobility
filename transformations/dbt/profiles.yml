@@ -9,5 +9,5 @@ milano_mobility:
       schema: public
       user: "{{ env_var('TRANSFORMER_DB_USER', 'transformer') }}"
       password: "{{ env_var('TRANSFORMER_DB_PASSWORD', 'transformer_dev') }}"
-      threads: 4
+      threads: "{{ env_var('DBT_THREADS', '1') | int }}"
       connect_timeout: 10

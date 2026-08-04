@@ -14,18 +14,28 @@ demand.
 
 ## Quick start
 
-Requirements: Docker with Compose and at least 4 GB of available memory. The same command
-works in Linux and macOS terminals and in Windows PowerShell:
+Requirements: Docker with Compose, an internet connection, at least 8 GB of available
+memory, and 10 GB of free disk space. The same command works in Linux and macOS terminals
+and in Windows PowerShell:
 
 ```bash
 docker compose --profile demo run --build --rm demo
 ```
 
-That single command builds the application, starts PostgreSQL and MinIO, loads the
-deterministic GTFS snapshot, executes all dbt models and tests, and prints a final
-`PUBLISHED` result with source row counts. No host Python, Make, database, or `.env` file
-is required. On a typical laptop the first image build takes several minutes; later starts
-reuse the cache. Repeating the command prints `SKIPPED`, demonstrating idempotency.
+That single command builds the application, starts PostgreSQL and MinIO, downloads and
+loads the complete official Comune di Milano/AMAT GTFS feed, executes every dbt model and
+test, and prints a final `PUBLISHED` result with source row counts. No host Python, Make,
+database, or `.env` file is required. On a typical laptop the first image build and full
+load take several minutes; later image builds reuse the cache. Repeating an unchanged feed
+prints `SKIPPED`, demonstrating idempotency.
+
+The live source is [`https://dati.comune.milano.it/gtfs.zip`](https://dati.comune.milano.it/gtfs.zip),
+published in the [Comune di Milano open-data catalogue](https://dati.comune.milano.it/en/dataset/ds929-orari-del-trasporto-pubblico-locale-nel-comune-di-milano-in-formato-gtfs)
+from AMAT data under CC BY 4.0. Because this is the current official feed rather than a
+checked-in sample, its checksum, row counts, and service window change when the publisher
+releases a new version. Each downloaded ZIP is retained immutably in MinIO with its
+SHA-256 digest and acquisition date. Small synthetic feeds in `tests/fixtures/` are used
+only by automated tests.
 
 The core services remain available after the command:
 
@@ -36,8 +46,9 @@ The core services remain available after the command:
 The dashboard is configured automatically and reads the published marts through the
 least-privilege `bi_reader` role. It includes network KPIs, service-volume trends, hourly
 departures, route coverage, a stop constellation, entity-change summaries, and visual
-data lineage. It has no external browser dependencies, so it also works offline after the
-images have been built.
+data lineage. Route coverage and the stop map use every route and stop in the published
+official snapshot. The browser interface has no third-party runtime dependencies; only
+the first official-feed download requires network access.
 
 To stop them without deleting the generated data, run `docker compose down`.
 
@@ -63,13 +74,8 @@ value configured in `.env`). Use the
 versioned queries in [`dashboards/questions.sql`](dashboards/questions.sql) to create the
 four supplied dashboard cards.
 
-Load the changed second snapshot to demonstrate historical versioning:
-
-```bash
-make demo-second
-```
-
-Then inspect the change events:
+When a later official payload is published, run the same demo command again. Its new hash
+creates the next snapshot and type-2 history. Then inspect the change events:
 
 ```bash
 docker compose exec postgres psql -U postgres -d mobility -c \
@@ -108,6 +114,8 @@ seconds (`87,000`) until the analytical layer needs a timestamp.
   does not block transport publication.
 - `marts.fact_scheduled_trip`: one scheduled trip per source snapshot and service date.
 - `marts.fact_stop_event`: one scheduled call per trip, service date, and stop sequence.
+- `marts.dashboard_service_activity` and `marts.dashboard_stop_activity`: compact,
+  pre-aggregated tables used by the visual dashboard and BI queries.
 - `marts.fact_network_change`: added, removed, and modified stops, routes, and trips between
   consecutive snapshots.
 
@@ -128,7 +136,7 @@ row counts are written as JSON under `s3://curated/quality/`.
 Run validation without infrastructure:
 
 ```bash
-mobility validate --feed tests/fixtures/gtfs_v1.zip --snapshot-date 2026-07-28
+mobility validate --feed tests/fixtures/gtfs_v1.zip --snapshot-date 2026-07-31
 ```
 
 ## Development
@@ -188,9 +196,10 @@ ingestion writes only audit/staging, dbt owns core/marts, and BI can only read m
   warehouse.
 - Weather is optional by design, preventing an enrichment outage from hiding the transport
   schedule. Production weather backfills should retain provider payloads and licenses.
-- The demo uses dbt full-table models for transparent, deterministic history. At greater
-  scale, facts should be incremental `merge` models partitioned by snapshot and service
-  date.
+- Complete service-day-expanded facts remain queryable as views, while compact dashboard
+  aggregates are materialized. This preserves full official-feed semantics without
+  duplicating tens of millions of rows on every laptop. A multi-snapshot production
+  warehouse should use incremental, date-partitioned facts.
 - Airflow and Metabase make the architecture easy to inspect but require more laptop memory
   than a CLI-only demo.
 

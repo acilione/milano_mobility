@@ -43,8 +43,8 @@ def test_valid_fixture_passes_all_blocking_checks() -> None:
     )
     assert report.status == "passed"
     assert not report.blocking
-    assert report.row_counts["stops"] == 3
-    assert report.row_counts["stop_times"] == 6
+    assert report.row_counts["stops"] == 15
+    assert report.row_counts["stop_times"] == 144
 
 
 def test_invalid_foreign_key_is_critical() -> None:
@@ -81,6 +81,22 @@ def test_report_serialization_contains_gate_result() -> None:
     assert value["pipeline_run_id"] == "unit-json"
 
 
+def test_stop_time_rows_do_not_need_physical_sequence_order(tmp_path: Path) -> None:
+    feed = changed_feed(
+        tmp_path,
+        replacements={
+            "stop_times.txt": (
+                "R1_T1,05:35:00,05:35:30,S10,1,,0,0\nR1_T1,05:42:00,05:42:30,S13,2,,0,0",
+                "R1_T1,05:42:00,05:42:30,S13,2,,0,0\nR1_T1,05:35:00,05:35:30,S10,1,,0,0",
+            )
+        },
+    )
+
+    report = validate_feed(feed, "unit-unsorted-stop-times", date(2026, 7, 28))
+
+    assert report.status == "passed"
+
+
 @pytest.mark.parametrize(
     ("replacements", "omitted", "expected_rule"),
     [
@@ -114,12 +130,12 @@ def test_report_serialization_contains_gate_result() -> None:
         (
             {
                 "stop_times.txt": (
-                    "T1,06:00:00,06:00:30,S3,1,,0,0\nT1,06:05:00,06:05:30,S1,2,,0,0",
-                    "T1,06:05:00,06:05:30,S1,2,,0,0\nT1,06:00:00,06:00:30,S3,1,,0,0",
+                    "R1_T1,05:35:00,05:35:30,S10,1,,0,0",
+                    "R1_T1,05:35:00,05:35:30,S10,-1,,0,0",
                 )
             },
             set(),
-            "increasing_stop_sequence",
+            "valid_stop_sequence",
         ),
         (
             {"agency.txt": ("Europe/Rome", "Invalid/Timezone")},

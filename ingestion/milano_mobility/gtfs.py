@@ -107,6 +107,21 @@ def iter_gtfs_rows(path: Path, filename: str) -> Iterator[dict[str, str]]:
                 yield {key.strip(): (value or "").strip() for key, value in row.items() if key}
 
 
+def gtfs_headers(path: Path, filename: str) -> tuple[str, ...]:
+    """Read a GTFS member's normalized header without materializing its rows."""
+    with zipfile.ZipFile(path) as archive:
+        try:
+            raw = archive.open(filename)
+        except KeyError:
+            return ()
+        with raw, io.TextIOWrapper(raw, encoding="utf-8-sig", newline="") as text:
+            reader = csv.reader(text)
+            try:
+                return tuple(value.strip() for value in next(reader))
+            except StopIteration as error:
+                raise GTFSError(f"{filename} has no header") from error
+
+
 def read_gtfs_tables(path: Path) -> dict[str, list[dict[str, str]]]:
     """Read all supported GTFS tables for validation or small fixtures."""
     members = archive_members(path)

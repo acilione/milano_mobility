@@ -159,6 +159,14 @@ CREATE TABLE IF NOT EXISTS staging.weather_day (
 GRANT USAGE ON SCHEMA audit, staging TO :"ingestion_user";
 GRANT SELECT, INSERT, UPDATE ON audit.ingestion_manifest TO :"ingestion_user";
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA staging TO :"ingestion_user";
+ALTER TABLE staging.agency OWNER TO :"ingestion_user";
+ALTER TABLE staging.stops OWNER TO :"ingestion_user";
+ALTER TABLE staging.routes OWNER TO :"ingestion_user";
+ALTER TABLE staging.trips OWNER TO :"ingestion_user";
+ALTER TABLE staging.stop_times OWNER TO :"ingestion_user";
+ALTER TABLE staging.calendar OWNER TO :"ingestion_user";
+ALTER TABLE staging.calendar_dates OWNER TO :"ingestion_user";
+ALTER TABLE staging.weather_day OWNER TO :"ingestion_user";
 
 GRANT CONNECT ON DATABASE mobility TO :"transformer_user", :"bi_user";
 GRANT USAGE ON SCHEMA audit, staging, staging_dbt, core, marts TO :"transformer_user";

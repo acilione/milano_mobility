@@ -1,3 +1,3 @@
 select *
-from {{ ref('fact_stop_event') }}
+from {{ ref('stg_stop_times') }}
 where arrival_seconds > departure_seconds + 300

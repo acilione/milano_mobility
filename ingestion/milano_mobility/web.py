@@ -53,38 +53,39 @@ def load_dashboard_data() -> dict[str, Any]:
         ) as connection:
             summary = connection.execute(
                 """
-                WITH trip_summary AS (
-                    SELECT
-                        max(snapshot_date) AS snapshot_date,
-                        count(DISTINCT scheduled_trip_sk) AS scheduled_trips,
-                        count(DISTINCT service_date) AS service_days
-                    FROM marts.fact_scheduled_trip
-                ),
-                event_summary AS (
-                    SELECT count(DISTINCT stop_event_sk) AS stop_events
-                    FROM marts.fact_stop_event
-                ),
-                stop_summary AS (
-                    SELECT count(*) AS active_stops
-                    FROM marts.dim_stop
-                    WHERE is_current
-                ),
-                route_summary AS (
-                    SELECT count(*) AS active_routes
-                    FROM marts.dim_route
-                    WHERE is_current
+                WITH latest_snapshot AS (
+                    SELECT max(snapshot_date) AS snapshot_date
+                    FROM marts.dashboard_service_activity
                 )
-                SELECT *
-                FROM trip_summary, event_summary, stop_summary, route_summary
+                SELECT
+                    latest.snapshot_date,
+                    sum(service.scheduled_trips) AS scheduled_trips,
+                    count(DISTINCT service.service_date) AS service_days,
+                    (
+                        SELECT sum(stop.stop_events)
+                        FROM marts.dashboard_stop_activity AS stop
+                        WHERE stop.snapshot_date = latest.snapshot_date
+                    ) AS stop_events,
+                    (
+                        SELECT count(DISTINCT stop.stop_sk)
+                        FROM marts.dashboard_stop_activity AS stop
+                        WHERE stop.snapshot_date = latest.snapshot_date
+                    ) AS active_stops,
+                    count(DISTINCT service.route_sk) AS active_routes
+                FROM marts.dashboard_service_activity AS service
+                CROSS JOIN latest_snapshot AS latest
+                WHERE service.snapshot_date = latest.snapshot_date
+                GROUP BY latest.snapshot_date
                 """
             ).fetchone()
             departures = connection.execute(
                 """
                 SELECT
-                    floor(trip.departure_seconds / 3600)::integer AS service_hour,
-                    count(*) AS departures
-                FROM marts.fact_scheduled_trip AS trip
-                WHERE trip.departure_seconds IS NOT NULL
+                    service_hour,
+                    sum(scheduled_trips) AS departures
+                FROM marts.dashboard_service_activity
+                WHERE snapshot_date = (SELECT max(snapshot_date) FROM marts.dashboard_service_activity)
+                  AND service_hour IS NOT NULL
                 GROUP BY 1
                 ORDER BY 1
                 """
@@ -98,34 +99,67 @@ def load_dashboard_data() -> dict[str, Any]:
                     calendar.is_holiday,
                     weather.temperature_max_c,
                     weather.precipitation_mm,
-                    count(DISTINCT trip.scheduled_trip_sk) AS scheduled_trips
+                    coalesce(sum(service.scheduled_trips), 0) AS scheduled_trips
                 FROM marts.dim_date AS calendar
                 LEFT JOIN marts.dim_weather_day AS weather USING (date_key)
-                LEFT JOIN marts.fact_scheduled_trip AS trip USING (date_key)
+                LEFT JOIN marts.dashboard_service_activity AS service USING (date_key)
+                WHERE calendar.date BETWEEN
+                    (SELECT min(service_date) FROM marts.dashboard_service_activity)
+                    AND (SELECT max(service_date) FROM marts.dashboard_service_activity)
+                  AND service.snapshot_date = (
+                      SELECT max(snapshot_date) FROM marts.dashboard_service_activity
+                  )
                 GROUP BY 1, 2, 3, 4, 5, 6
                 ORDER BY 1
                 """
             ).fetchall()
             route_coverage = connection.execute(
                 """
+                WITH latest_snapshot AS (
+                    SELECT max(snapshot_date) AS snapshot_date
+                    FROM marts.dashboard_service_activity
+                ),
+                service_by_route AS (
+                    SELECT route_sk, sum(scheduled_trips) AS trips
+                    FROM marts.dashboard_service_activity AS service
+                    CROSS JOIN latest_snapshot
+                    WHERE service.snapshot_date = latest_snapshot.snapshot_date
+                    GROUP BY route_sk
+                ),
+                stops_by_route AS (
+                    SELECT
+                        route_sk,
+                        count(DISTINCT stop_sk) AS served_stops,
+                        sum(stop_events) AS stop_events
+                    FROM marts.dashboard_stop_activity AS stop
+                    CROSS JOIN latest_snapshot
+                    WHERE stop.snapshot_date = latest_snapshot.snapshot_date
+                    GROUP BY route_sk
+                )
                 SELECT
-                    coalesce(route.route_short_name, route.route_id) AS route_name,
+                    CASE
+                        WHEN route.route_type = 1 AND route.route_short_name LIKE 'M%'
+                            THEN route.route_short_name
+                        WHEN route.route_type = 1 THEN 'M' || route.route_short_name
+                        ELSE coalesce(route.route_short_name, route.route_id)
+                    END AS route_name,
                     route.route_long_name,
                     route.route_color,
-                    count(DISTINCT stop.stop_id) AS served_stops,
-                    count(DISTINCT event.trip_id) AS trips,
-                    count(*) AS stop_events
-                FROM marts.fact_stop_event AS event
+                    route.route_type,
+                    stops.served_stops,
+                    service.trips,
+                    stops.stop_events
+                FROM service_by_route AS service
+                JOIN stops_by_route AS stops USING (route_sk)
                 JOIN marts.dim_route AS route USING (route_sk)
-                JOIN marts.dim_stop AS stop USING (stop_sk)
-                GROUP BY 1, 2, 3
-                ORDER BY 1
+                ORDER BY route.route_type, 1
                 """
             ).fetchall()
             changes = connection.execute(
                 """
                 SELECT entity_type, change_type, count(*) AS changed_entities
                 FROM marts.fact_network_change
+                WHERE snapshot_date = (SELECT max(snapshot_date) FROM marts.fact_network_change)
                 GROUP BY 1, 2
                 ORDER BY 1, 2
                 """
@@ -137,10 +171,12 @@ def load_dashboard_data() -> dict[str, Any]:
                     stop.stop_name,
                     stop.stop_lat,
                     stop.stop_lon,
-                    count(*) AS stop_events
-                FROM marts.fact_stop_event AS event
+                    sum(activity.stop_events) AS stop_events
+                FROM marts.dashboard_stop_activity AS activity
                 JOIN marts.dim_stop AS stop USING (stop_sk)
-                WHERE stop.is_current
+                WHERE activity.snapshot_date = (
+                    SELECT max(snapshot_date) FROM marts.dashboard_stop_activity
+                )
                 GROUP BY 1, 2, 3, 4
                 ORDER BY stop_events DESC, stop.stop_name
                 """
@@ -278,7 +314,9 @@ DASHBOARD_HTML = r"""<!doctype html>
     .bar:hover:before { content:attr(data-value); position:absolute; top:-29px; left:50%; transform:translateX(-50%); background:#eef7f1; color:#07110f; border-radius:5px; padding:3px 6px; font-size:11px; font-weight:800; }
     .hour { font-size:10px; color:var(--muted); margin-top:8px; }
     #trend { width:100%; height:235px; overflow:visible; }
-    .route-list { display:grid; gap:10px; }
+    .mode-summary { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+    .mode-summary span { color:var(--muted); border:1px solid var(--line); border-radius:99px; padding:5px 10px; font-size:11px; }
+    .route-list { display:grid; gap:10px; max-height:490px; overflow-y:auto; padding-right:8px; scrollbar-color:var(--mint) transparent; }
     .route { display:grid; grid-template-columns:42px 1fr auto; gap:12px; align-items:center; padding:12px 0; border-bottom:1px solid var(--line); }
     .route:last-child { border:0; }
     .route-badge { width:39px; height:27px; display:grid; place-items:center; border-radius:7px; background:var(--lime); color:#07110f; font-weight:850; font-size:12px; }
@@ -321,19 +359,24 @@ DASHBOARD_HTML = r"""<!doctype html>
       <div>
         <div class="eyebrow">Scheduled transport intelligence / Milan</div>
         <h1>See the network.<br><em>Read the rhythm.</em></h1>
-        <div class="lede">A living view of planned public-transport supply, historical network versions, service-day patterns, and quality-controlled data products.</div>
+        <div class="lede">A living view of Milan's complete official scheduled public-transport feed, historical network versions, service-day patterns, and quality-controlled data products.</div>
       </div>
       <div class="snapshot"><span>Source snapshot</span><strong id="snapshot">Preparing data</strong><small id="generated">The page refreshes automatically</small></div>
     </header>
     <main id="main">
       <section class="waiting"><div class="waiting-orbit"></div><h2>Building the first analytical view</h2><p>The dashboard will populate as soon as dbt publishes the marts.</p></section>
     </main>
-    <footer><span>Milano Mobility Data Platform · local-first analytics</span><span>Static GTFS measures scheduled supply, not real-time punctuality.</span></footer>
+    <footer><span>Official GTFS · Comune di Milano / AMAT · CC BY 4.0</span><span>Static GTFS measures scheduled supply, not real-time punctuality.</span></footer>
   </div>
   <script>
     const fmt = n => new Intl.NumberFormat("en-GB").format(Number(n || 0));
     const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-    const cleanColor = c => /^[0-9a-fA-F]{6}$/.test(c || "") ? `#${c}` : "#c8ff63";
+    const routeColor = r => {
+      const metro={M1:"#e51b23",M2:"#009d58",M3:"#ffd500",M4:"#0072ce",M5:"#8a2be2"};
+      if(metro[r.route_name])return metro[r.route_name];
+      if(/^[0-9a-fA-F]{6}$/.test(r.route_color||""))return `#${r.route_color}`;
+      return +r.route_type===0?"#ffc45c":+r.route_type===1?"#c8ff63":"#68b5ff";
+    };
     function metric(label,value,note){return `<article class="card"><span class="label">${label}</span><strong class="value">${fmt(value)}</strong><span class="note">${note}</span></article>`}
     function hourly(rows){
       const max=Math.max(...rows.map(x=>+x.departures),1);
@@ -349,12 +392,16 @@ DASHBOARD_HTML = r"""<!doctype html>
     function map(stops){
       if(!stops.length)return "<div class='waiting'>No geocoded stops are available.</div>";
       const lats=stops.map(x=>+x.stop_lat),lons=stops.map(x=>+x.stop_lon),minLat=Math.min(...lats),maxLat=Math.max(...lats),minLon=Math.min(...lons),maxLon=Math.max(...lons);
-      const pt=(s,i)=>{const x=55+((+s.stop_lon-minLon)/Math.max(maxLon-minLon,.0001))*650,y=305-((+s.stop_lat-minLat)/Math.max(maxLat-minLat,.0001))*260,r=8+Math.min(12,Math.sqrt(+s.stop_events));return {x,y,r,s,i}};
+      const pt=(s,i)=>{const x=35+((+s.stop_lon-minLon)/Math.max(maxLon-minLon,.0001))*690,y=320-((+s.stop_lat-minLat)/Math.max(maxLat-minLat,.0001))*290,r=1.5+Math.min(5,Math.log10(+s.stop_events+1));return {x,y,r,s,i}};
       const points=stops.map(pt);
-      const links=points.slice(1).map((p,i)=>`<line x1="${points[i].x}" y1="${points[i].y}" x2="${p.x}" y2="${p.y}" stroke="#48e3b5" stroke-opacity=".35" stroke-width="3" stroke-dasharray="5 7"/>`).join("");
-      return `<div class="map"><svg id="network-map" viewBox="0 0 760 350">${links}${points.map(p=>`<g><circle cx="${p.x}" cy="${p.y}" r="${p.r+6}" fill="#48e3b5" opacity=".1"/><circle cx="${p.x}" cy="${p.y}" r="${p.r}" fill="#c8ff63" stroke="#07110f" stroke-width="4"/><text x="${p.x+p.r+8}" y="${p.y+4}" fill="#eef7f1" font-size="13" font-weight="700">${esc(p.s.stop_name)}</text><title>${esc(p.s.stop_name)} · ${fmt(p.s.stop_events)} scheduled calls</title></g>`).join("")}</svg></div>`;
+      const labels=points.slice(0,18);
+      return `<div class="map"><svg id="network-map" viewBox="0 0 760 350">${points.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="${p.r}" fill="#48e3b5" fill-opacity=".62" stroke="#07110f" stroke-width=".5"><title>${esc(p.s.stop_name)} · ${fmt(p.s.stop_events)} scheduled calls</title></circle>`).join("")}${labels.map(p=>`<g><circle cx="${p.x}" cy="${p.y}" r="${p.r+4}" fill="#c8ff63" opacity=".18"/><text x="${p.x+p.r+5}" y="${p.y+3}" fill="#eef7f1" font-size="9" font-weight="700">${esc(p.s.stop_name)}</text></g>`).join("")}</svg></div>`;
     }
-    function routes(rows){return `<div class="route-list">${rows.map(r=>`<div class="route"><div class="route-badge" style="background:${cleanColor(r.route_color)}">${esc(r.route_name)}</div><div><strong>${esc(r.route_long_name||"Scheduled route")}</strong><small>${fmt(r.trips)} trip patterns</small></div><div class="route-metric">${fmt(r.served_stops)}<small>served stops</small></div></div>`).join("")}</div>`}
+    function routes(rows){
+      const names={0:"tram",1:"metro",3:"bus / trolleybus"}, counts={}; rows.forEach(r=>counts[r.route_type]=(counts[r.route_type]||0)+1);
+      const summary=Object.entries(counts).map(([type,count])=>`<span>${fmt(count)} ${names[type]||"other"} routes</span>`).join("");
+      return `<div class="mode-summary">${summary}</div><div class="route-list">${rows.map(r=>`<div class="route"><div class="route-badge" style="background:${routeColor(r)}">${esc(r.route_name)}</div><div><strong>${esc(r.route_long_name||"Scheduled route")}</strong><small>${fmt(r.trips)} scheduled trips</small></div><div class="route-metric">${fmt(r.served_stops)}<small>served stops</small></div></div>`).join("")}</div>`
+    }
     function changes(rows){
       const grouped={stop:{},route:{},trip:{}}; rows.forEach(x=>(grouped[x.entity_type]??={})[x.change_type]=+x.changed_entities);
       return `<div class="change-grid">${Object.entries(grouped).map(([name,v])=>`<div class="change"><span class="entity">${name} changes</span><strong>${fmt(Object.values(v).reduce((a,b)=>a+b,0))}</strong><div class="split"><span class="added">+ ${fmt(v.ADDED||0)} added</span><span class="modified">● ${fmt(v.MODIFIED||0)} modified</span><span class="removed">- ${fmt(v.REMOVED||0)} removed</span></div></div>`).join("")}</div>`;
@@ -366,12 +413,12 @@ DASHBOARD_HTML = r"""<!doctype html>
       document.querySelector("#generated").textContent=`Updated ${new Date(d.generated_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`;
       const s=d.summary;
       document.querySelector("#main").innerHTML=`
-        <section class="kpis">${metric("Scheduled trips",s.scheduled_trips,"Across the published service window")}${metric("Stop events",s.stop_events,"Quality-tested scheduled calls")}${metric("Active stops",s.active_stops,"Current SCD type-2 entities")}${metric("Active routes",s.active_routes,"Current published network")}${metric("Service days",s.service_days,"Calendar and holiday enriched")}</section>
+        <section class="kpis">${metric("Scheduled trips",s.scheduled_trips,"Latest official service window")}${metric("Stop events",s.stop_events,"Quality-tested scheduled calls")}${metric("Active stops",s.active_stops,"Served in the latest snapshot")}${metric("Active routes",s.active_routes,"Official ATM network")}${metric("Service days",s.service_days,"Calendar and holiday enriched")}</section>
         <section class="dashboard-grid">
           <article class="panel"><div class="panel-head"><div><h2>Departures by service hour</h2><p>GTFS hours remain valid beyond midnight.</p></div><span class="tag">Supply rhythm</span></div>${hourly(d.departures)}</article>
           <article class="panel"><div class="panel-head"><div><h2>Route coverage</h2><p>Distinct scheduled stops by line.</p></div><span class="tag">Network</span></div>${routes(d.route_coverage)}</article>
           <article class="panel wide"><div class="panel-head"><div><h2>Scheduled service calendar</h2><p>Daily trip volume across weekdays, weekends, and holidays.</p></div><span class="tag">${fmt(d.service_days.length)} days</span></div>${trend(d.service_days)}</article>
-          <article class="panel"><div class="panel-head"><div><h2>Stop constellation</h2><p>Relative Milan coordinates sized by scheduled calls.</p></div><span class="tag">${fmt(d.stops.length)} points</span></div>${map(d.stops)}</article>
+          <article class="panel"><div class="panel-head"><div><h2>Stop constellation</h2><p>Every official stop, with the busiest locations labelled.</p></div><span class="tag">${fmt(d.stops.length)} points</span></div>${map(d.stops)}</article>
           <article class="panel"><div class="panel-head"><div><h2>Network change ledger</h2><p>Added, modified, and removed GTFS entities.</p></div><span class="tag">Version-aware</span></div>${changes(d.changes)}</article>
           <article class="panel wide"><div class="panel-head"><div><h2>From source file to visual evidence</h2><p>Every published metric crosses the same observable quality gates.</p></div><span class="tag">Lineage</span></div><div class="pipeline"><div class="stage"><b>01 / ARCHIVE</b><span>GTFS snapshot</span><small>SHA-256 and immutable object key</small></div><div class="stage"><b>02 / VALIDATE</b><span>Quality gate</span><small>Schema, keys, times, coordinates</small></div><div class="stage"><b>03 / MODEL</b><span>dbt warehouse</span><small>History, facts, dimensions</small></div><div class="stage"><b>04 / TEST</b><span>48 assertions</span><small>Relationships and business rules</small></div><div class="stage"><b>05 / OBSERVE</b><span>Visual mart</span><small>Read-only BI role</small></div></div></article>
         </section>`;
