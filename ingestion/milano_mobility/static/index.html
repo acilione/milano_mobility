@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#07110f">
   <title>Mobility Observatory</title>
+  <link rel="stylesheet" href="/assets/maplibre-gl.css">
   <style>
     :root {
       --ink:#eef7f1;--muted:#91a49b;--panel:rgba(15,31,27,.88);--line:rgba(217,240,226,.12);
@@ -57,12 +58,13 @@
     .route-metric{text-align:right;font-weight:760}.route-metric small{display:block;font-weight:400}
     .map-layout{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:14px}.map{height:430px;position:relative;border:1px solid var(--line);
       border-radius:14px;overflow:hidden;touch-action:none;background:radial-gradient(circle at 60% 30%,rgba(72,227,181,.12),transparent 35%),
-      linear-gradient(135deg,rgba(255,255,255,.02),transparent)}#network-map{width:100%;height:100%;display:block;cursor:grab;outline:none}
-    #network-map.dragging{cursor:grabbing}.map-stop{cursor:pointer;transition:fill-opacity .15s}.map-stop:hover,.map-stop:focus{fill-opacity:1;stroke:var(--ink)}
-    .map-stop.active{fill:var(--lime);fill-opacity:1;stroke:var(--ink);stroke-width:2}.map-label{pointer-events:none;paint-order:stroke;
-      stroke:var(--bg);stroke-width:3px;stroke-linejoin:round}.map-controls{position:absolute;z-index:2;top:12px;right:12px;display:grid;gap:6px}
-    .map-controls button{width:34px;height:34px;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:rgba(7,17,15,.9);
-      cursor:pointer;font-weight:800}.map-controls button:hover{border-color:var(--mint);color:var(--mint)}.map-hint{position:absolute;z-index:2;
+      linear-gradient(135deg,rgba(255,255,255,.02),transparent)}#network-map{width:100%;height:100%;display:block;outline:none}
+    #network-map .maplibregl-canvas{outline:none}.maplibregl-ctrl-group{background:rgba(7,17,15,.92)!important;border:1px solid var(--line)}
+    .maplibregl-ctrl-group button{filter:invert(1)}.maplibregl-ctrl-attrib{background:rgba(7,17,15,.78)!important;color:var(--muted)!important}
+    .maplibregl-ctrl-attrib a{color:var(--ink)!important}.stop-popup{pointer-events:none}.stop-popup .maplibregl-popup-content{color:var(--ink);
+      background:rgba(7,17,15,.94);border:1px solid var(--line);border-radius:9px;padding:9px 11px;box-shadow:0 8px 24px rgba(0,0,0,.32)}
+    .stop-popup .maplibregl-popup-tip{border-top-color:rgba(7,17,15,.94)!important}.stop-popup strong,.stop-popup small{display:block}
+    .stop-popup strong{font-size:12px}.stop-popup small{color:var(--muted);font-size:10px;margin-top:2px}.map-hint{position:absolute;z-index:2;
       left:12px;bottom:10px;color:var(--muted);background:rgba(7,17,15,.85);padding:4px 8px;border-radius:6px;font-size:10px}
     .stop-detail{border:1px solid var(--line);border-radius:14px;padding:18px;min-height:160px}.stop-detail .empty{color:var(--muted);margin-top:42px}
     .stop-detail h3{font-size:19px;margin:2px 0 4px}.stop-detail .stop-id{color:var(--muted);font-size:11px}.stop-stat{font-size:25px;
@@ -97,10 +99,11 @@
       <p>The dashboard will populate as soon as dbt publishes the marts.</p></section></main>
     <footer><span id="attribution"></span><span>Static GTFS measures scheduled supply, not real-time punctuality.</span></footer>
   </div>
-  <script>
+  <script type="module">
+    import {createMap} from "/assets/map.js";
     const fmt=n=>new Intl.NumberFormat(undefined).format(Number(n||0));
     const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-    const attr=esc;let currentSnapshot=null,refreshTimer=null;
+    const attr=esc;let currentSnapshot=null,refreshTimer=null,mapController=null;
     const modeName=type=>({0:"tram",1:"metro",2:"rail",3:"bus / trolleybus",4:"ferry"}[type]||"other");
     const routeName=r=>+r.route_type===1&&!String(r.route_name).toUpperCase().startsWith("M")?`M${r.route_name}`:String(r.route_name||"");
     const routeColor=r=>/^[0-9a-fA-F]{6}$/.test(r.route_color||"")?`#${r.route_color}`:+r.route_type===0?"#ffc45c":+r.route_type===1?"#c8ff63":"#68b5ff";
@@ -114,31 +117,18 @@
       const summary=Object.entries(counts).map(([type,count])=>`<span>${fmt(count)} ${modeName(type)} routes</span>`).join("");
       return `<div class="mode-summary">${summary}</div><div class="route-list" id="route-list">${rows.map(r=>`<div class="route" data-route="${attr(r.route_sk)}"><div class="route-badge" style="background:${routeColor(r)}">${esc(routeName(r))}</div><div><strong>${esc(r.route_long_name||"Scheduled route")}</strong><small>${fmt(r.trips)} scheduled trips</small></div><div class="route-metric">${fmt(r.served_stops)}<small>served stops</small></div></div>`).join("")}</div>`}
     function mapMarkup(stops){if(!stops.length)return "<div class='waiting'>No geocoded stops are available.</div>";
-      const lats=stops.map(x=>+x.stop_lat),lons=stops.map(x=>+x.stop_lon),minLat=Math.min(...lats),maxLat=Math.max(...lats),minLon=Math.min(...lons),maxLon=Math.max(...lons);
-      const points=stops.map((s,i)=>({x:20+((+s.stop_lon-minLon)/Math.max(maxLon-minLon,.0001))*960,y:580-((+s.stop_lat-minLat)/Math.max(maxLat-minLat,.0001))*560,r:2+Math.min(6,Math.log10(+s.stop_events+1)),s,i}));
-      return `<div class="map-layout"><div class="map"><div class="map-controls"><button type="button" data-map-action="in" aria-label="Zoom in">+</button><button type="button" data-map-action="out" aria-label="Zoom out">-</button><button type="button" data-map-action="reset" aria-label="Reset map">&#8634;</button></div><svg id="network-map" viewBox="0 0 1000 600" tabindex="0" role="application" aria-label="Interactive map of scheduled stops. Drag to pan, scroll to zoom, and select a stop for details."><g id="map-layer">${points.map(p=>`<circle class="map-stop" data-stop="${p.i}" tabindex="0" cx="${p.x}" cy="${p.y}" r="${p.r}" fill="#48e3b5" fill-opacity=".62" stroke="#07110f" stroke-width=".6"><title>${esc(p.s.stop_name)}: ${fmt(p.s.stop_events)} scheduled calls</title></circle>`).join("")}</g></svg><span class="map-hint">Drag to pan &middot; wheel to zoom &middot; click a stop</span></div><aside class="stop-detail" id="stop-detail" aria-live="polite"><p class="empty">Select a stop to see its scheduled calls and connected routes.</p></aside></div>`}
+      return `<div class="map-layout"><div class="map"><div id="network-map" role="application" aria-label="Interactive MapLibre map of scheduled stops"></div><span class="map-hint">Drag to pan &middot; wheel to zoom &middot; click a cluster or stop</span></div><aside class="stop-detail" id="stop-detail" aria-live="polite"><p class="empty">Select a stop to see its scheduled calls and connected routes.</p></aside></div>`}
     function changes(rows){const grouped={stop:{},route:{},trip:{}};rows.forEach(x=>(grouped[x.entity_type]??={})[x.change_type]=+x.changed_entities);
       return `<div class="change-grid">${Object.entries(grouped).map(([name,v])=>`<div class="change"><span class="entity">${name} changes</span><strong>${fmt(Object.values(v).reduce((a,b)=>a+b,0))}</strong><div class="split"><span class="added">+ ${fmt(v.ADDED||0)} added</span><span class="modified">&bull; ${fmt(v.MODIFIED||0)} modified</span><span class="removed">- ${fmt(v.REMOVED||0)} removed</span></div></div>`).join("")}</div>`}
     function applyMeta(meta){document.title=meta.title;document.querySelector("#brand").textContent=meta.title;document.querySelector("#eyebrow").textContent=`Scheduled transport intelligence / ${meta.area_name}`;
       document.querySelector("#lede").textContent=`A quality-controlled view of ${meta.area_name}'s complete scheduled public-transport network.`;
       const source=meta.source_url?`<a href="${attr(meta.source_url)}">${esc(meta.source_label)}</a>`:esc(meta.source_label);document.querySelector("#attribution").innerHTML=`Official GTFS &middot; ${source} &middot; ${esc(meta.license)}`}
-    function selectStop(stops,index){const stop=stops[index],routeIds=new Set((stop.routes||[]).map(r=>String(r.route_sk)));history.replaceState(null,"",`#stop=${encodeURIComponent(stop.stop_id)}`);document.querySelectorAll(".map-stop").forEach((dot,i)=>dot.classList.toggle("active",i===index));
+    function selectStop(stops,index){const stop=stops[index],routeIds=new Set((stop.routes||[]).map(r=>String(r.route_sk)));history.replaceState(null,"",`#stop=${encodeURIComponent(stop.stop_id)}`);
       const list=document.querySelector("#route-list");list?.classList.add("has-selection");document.querySelectorAll(".route").forEach(row=>row.classList.toggle("connected",routeIds.has(row.dataset.route)));
       document.querySelector("#stop-detail").innerHTML=`<span class="stop-id">STOP ${esc(stop.stop_id)}</span><h3>${esc(stop.stop_name)}</h3><div class="stop-stat">${fmt(stop.stop_events)}<small>scheduled calls in this snapshot</small></div><p>${fmt((stop.routes||[]).length)} connected routes</p><div class="route-chips">${(stop.routes||[]).map(r=>`<span class="route-chip"><i style="background:${routeColor(r)}"></i>${esc(routeName(r))}</span>`).join("")}</div>`;
       list?.scrollTo({top:0,behavior:"smooth"})}
-    function initMap(stops){const svg=document.querySelector("#network-map");if(!svg)return;const initial={x:0,y:0,w:1000,h:600},view={...initial};let drag=null,moved=false;
-      const update=()=>svg.setAttribute("viewBox",`${view.x} ${view.y} ${view.w} ${view.h}`),clamp=()=>{view.x=Math.max(0,Math.min(1000-view.w,view.x));view.y=Math.max(0,Math.min(600-view.h,view.y))};
-      const zoom=(factor,clientX,clientY)=>{const rect=svg.getBoundingClientRect(),px=clientX===undefined ? .5 : (clientX-rect.left)/rect.width,py=clientY===undefined ? .5 : (clientY-rect.top)/rect.height;
-        const oldW=view.w,oldH=view.h;view.w=Math.max(120,Math.min(1000,view.w*factor));view.h=view.w*.6;view.x+=(oldW-view.w)*px;view.y+=(oldH-view.h)*py;clamp();update()};
-      svg.addEventListener("wheel",event=>{event.preventDefault();zoom(event.deltaY>0?1.18:.84,event.clientX,event.clientY)},{passive:false});
-      svg.addEventListener("pointerdown",event=>{if(event.target.closest?.(".map-stop")){drag=null;moved=false;return}drag={x:event.clientX,y:event.clientY,vx:view.x,vy:view.y};moved=false;svg.classList.add("dragging");svg.setPointerCapture(event.pointerId)});
-      svg.addEventListener("pointermove",event=>{if(!drag)return;const rect=svg.getBoundingClientRect(),dx=(event.clientX-drag.x)*view.w/rect.width,dy=(event.clientY-drag.y)*view.h/rect.height;moved=moved||Math.abs(dx)+Math.abs(dy)>2;view.x=drag.vx-dx;view.y=drag.vy-dy;clamp();update()});
-      svg.addEventListener("pointerup",()=>{drag=null;svg.classList.remove("dragging")});svg.addEventListener("pointercancel",()=>{drag=null;svg.classList.remove("dragging")});
-      svg.addEventListener("click",event=>{const dot=event.target.closest?.(".map-stop");if(dot&&!moved)selectStop(stops,+dot.dataset.stop)});
-      svg.addEventListener("keydown",event=>{const dot=event.target.closest?.(".map-stop");if(dot&&(event.key==="Enter"||event.key===" ")){event.preventDefault();selectStop(stops,+dot.dataset.stop);return}
-        const step=view.w*.08;if(event.key==="ArrowLeft")view.x-=step;else if(event.key==="ArrowRight")view.x+=step;else if(event.key==="ArrowUp")view.y-=step;else if(event.key==="ArrowDown")view.y+=step;else if(event.key==="+"||event.key==="=")zoom(.8);else if(event.key==="-")zoom(1.2);else if(event.key==="Home")Object.assign(view,initial);else return;event.preventDefault();clamp();update()});
-      document.querySelectorAll("[data-map-action]").forEach(button=>button.addEventListener("click",()=>{if(button.dataset.mapAction==="reset"){Object.assign(view,initial);update()}else zoom(button.dataset.mapAction==="in" ? .8 : 1.2)}));
-      const requestedStop=new URLSearchParams(location.hash.slice(1)).get("stop"),requestedIndex=stops.findIndex(stop=>String(stop.stop_id)===requestedStop);if(requestedIndex>=0)selectStop(stops,requestedIndex)}
+    function initMap(stops){mapController?.destroy();const requestedStop=new URLSearchParams(location.hash.slice(1)).get("stop"),requestedIndex=stops.findIndex(stop=>String(stop.stop_id)===requestedStop);
+      mapController=createMap("network-map",stops,index=>selectStop(stops,index),requestedIndex>=0?requestedIndex:null);if(requestedIndex>=0)selectStop(stops,requestedIndex)}
     function render(d){applyMeta(d.meta);if(d.state!=="ready"){document.querySelector("#main").innerHTML=`<section class="waiting"><div class="waiting-orbit"></div><h2>Dashboard online, marts pending</h2><p>${esc(d.message)}</p></section>`;return}
       document.querySelector("#pulse").classList.add("ready");document.querySelector("#status").textContent="Published marts online";document.querySelector("#snapshot").textContent=d.summary.snapshot_date||"Available";
       document.querySelector("#generated").textContent=`Updated ${new Date(d.generated_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`;if(currentSnapshot===d.summary.snapshot_date)return;currentSnapshot=d.summary.snapshot_date;const s=d.summary;

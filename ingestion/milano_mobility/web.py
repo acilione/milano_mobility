@@ -4,19 +4,36 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import date, datetime
 from decimal import Decimal
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import psycopg
 import structlog
 from psycopg.rows import dict_row
 
 logger = structlog.get_logger()
-DASHBOARD_HTML = files("milano_mobility").joinpath("static/index.html").read_text(encoding="utf-8")
+STATIC_ROOT = files("milano_mobility").joinpath("static")
+DASHBOARD_HTML = STATIC_ROOT.joinpath("index.html").read_text(encoding="utf-8")
+STATIC_ASSETS = {
+    "/assets/map.js": ("dist/map.js", "text/javascript; charset=utf-8"),
+    "/assets/maplibre-gl.mjs": ("dist/maplibre-gl.mjs", "text/javascript; charset=utf-8"),
+    "/assets/maplibre-gl-shared.mjs": (
+        "dist/maplibre-gl-shared.mjs",
+        "text/javascript; charset=utf-8",
+    ),
+    "/assets/maplibre-gl-worker.mjs": (
+        "dist/maplibre-gl-worker.mjs",
+        "text/javascript; charset=utf-8",
+    ),
+    "/assets/maplibre-gl.css": ("dist/maplibre-gl.css", "text/css; charset=utf-8"),
+}
+ROUTE_KEY_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 
 
 def _json_default(value: object) -> str:
@@ -25,6 +42,18 @@ def _json_default(value: object) -> str:
     if isinstance(value, Decimal):
         return str(value)
     raise TypeError(f"Cannot serialize {type(value).__name__}")
+
+
+def _static_asset(path: str) -> tuple[bytes, str] | None:
+    """Read one allow-listed bundled frontend asset."""
+    asset = STATIC_ASSETS.get(path)
+    if asset is None:
+        return None
+    filename, content_type = asset
+    try:
+        return STATIC_ROOT.joinpath(filename).read_bytes(), content_type
+    except FileNotFoundError:
+        return None
 
 
 def _database_parameters() -> dict[str, str | int]:
@@ -47,6 +76,74 @@ def _dashboard_metadata() -> dict[str, str | int]:
         "license": os.getenv("GTFS_LICENSE", "CC BY 4.0"),
         "refresh_seconds": int(os.getenv("DASHBOARD_REFRESH_SECONDS", "30")),
     }
+
+
+def _normalize_route_ids(values: list[str]) -> list[str]:
+    """Return unique warehouse route keys within a small request bound."""
+    return list(dict.fromkeys(value for value in values if ROUTE_KEY_PATTERN.fullmatch(value)))[:50]
+
+
+def load_route_shapes(route_ids: list[str]) -> list[dict[str, Any]]:
+    """Load display-sized official GTFS paths for selected routes."""
+    normalized_ids = _normalize_route_ids(route_ids)
+    if not normalized_ids:
+        return []
+    try:
+        parameters = _database_parameters()
+        with psycopg.connect(
+            host=str(parameters["host"]),
+            port=int(parameters["port"]),
+            dbname=str(parameters["dbname"]),
+            user=str(parameters["user"]),
+            password=str(parameters["password"]),
+            connect_timeout=int(parameters["connect_timeout"]),
+            row_factory=dict_row,
+        ) as connection:
+            return connection.execute(
+                """
+                WITH ordered_points AS (
+                    SELECT
+                        route_sk,
+                        shape_id,
+                        shape_pt_sequence,
+                        shape_pt_lat,
+                        shape_pt_lon,
+                        row_number() OVER shape AS point_position,
+                        count(*) OVER shape AS point_count
+                    FROM marts.dashboard_route_shape
+                    WHERE snapshot_date = (
+                        SELECT max(snapshot_date) FROM marts.dashboard_route_shape
+                    )
+                      AND route_sk = ANY(%s)
+                    WINDOW shape AS (
+                        PARTITION BY route_sk, shape_id ORDER BY shape_pt_sequence
+                    )
+                ),
+                sampled_points AS (
+                    SELECT *
+                    FROM ordered_points
+                    WHERE point_position IN (1, point_count)
+                       OR mod(
+                           point_position - 1,
+                           greatest(ceil(point_count / 120.0)::integer, 1)
+                       ) = 0
+                )
+                SELECT
+                    route_sk,
+                    shape_id,
+                    jsonb_agg(
+                        jsonb_build_array(shape_pt_lon, shape_pt_lat)
+                        ORDER BY shape_pt_sequence
+                    ) AS points
+                FROM sampled_points
+                GROUP BY route_sk, shape_id
+                ORDER BY route_sk, shape_id
+                """,
+                (normalized_ids,),
+            ).fetchall()
+    except psycopg.Error as error:
+        logger.info("route_shapes_unavailable", reason=str(error).splitlines()[0])
+        return []
 
 
 def load_dashboard_data() -> dict[str, Any]:
@@ -244,14 +341,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
     server_version = "MobilityDashboard/1.0"
 
     def do_GET(self) -> None:
-        if self.path in {"/", "/index.html"}:
+        request = urlsplit(self.path)
+        if request.path in {"/", "/index.html"}:
             self._send(HTTPStatus.OK, DASHBOARD_HTML, "text/html; charset=utf-8")
             return
-        if self.path == "/api/dashboard":
+        asset = _static_asset(request.path)
+        if asset is not None:
+            body, content_type = asset
+            self._send(HTTPStatus.OK, body, content_type)
+            return
+        if request.path == "/api/dashboard":
             payload = json.dumps(load_dashboard_data(), default=_json_default).encode()
             self._send(HTTPStatus.OK, payload, "application/json")
             return
-        if self.path == "/health":
+        if request.path == "/api/route-shapes":
+            route_ids = parse_qs(request.query).get("route_sk", [])
+            shape_payload = json.dumps(
+                {"routes": load_route_shapes(route_ids)}, default=_json_default
+            )
+            self._send(HTTPStatus.OK, shape_payload, "application/json")
+            return
+        if request.path == "/health":
             self._send(HTTPStatus.OK, b'{"status":"ok"}', "application/json")
             return
         self._send(HTTPStatus.NOT_FOUND, b'{"error":"not found"}', "application/json")

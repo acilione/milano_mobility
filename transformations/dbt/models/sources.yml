@@ -19,6 +19,7 @@ sources:
       - name: stops
       - name: routes
       - name: trips
+      - name: shapes
       - name: stop_times
       - name: calendar
       - name: calendar_dates

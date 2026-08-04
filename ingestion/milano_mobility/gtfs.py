@@ -17,6 +17,7 @@ SUPPORTED_FILES = (
     "stops.txt",
     "routes.txt",
     "trips.txt",
+    "shapes.txt",
     "stop_times.txt",
     "calendar.txt",
     "calendar_dates.txt",

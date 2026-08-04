@@ -57,6 +57,13 @@ TABLE_COLUMNS: dict[str, tuple[str, ...]] = {
         "block_id",
         "shape_id",
     ),
+    "shapes": (
+        "shape_id",
+        "shape_pt_lat",
+        "shape_pt_lon",
+        "shape_pt_sequence",
+        "shape_dist_traveled",
+    ),
     "stop_times": (
         "trip_id",
         "arrival_seconds",

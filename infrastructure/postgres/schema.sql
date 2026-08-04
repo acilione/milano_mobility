@@ -98,6 +98,19 @@ CREATE TABLE IF NOT EXISTS staging.trips (
     PRIMARY KEY (source_snapshot_date, pipeline_run_id, trip_id)
 );
 
+CREATE TABLE IF NOT EXISTS staging.shapes (
+    shape_id text NOT NULL,
+    shape_pt_lat double precision NOT NULL,
+    shape_pt_lon double precision NOT NULL,
+    shape_pt_sequence integer NOT NULL CHECK (shape_pt_sequence >= 0),
+    shape_dist_traveled double precision,
+    entity_hash char(64) NOT NULL,
+    source_snapshot_date date NOT NULL,
+    pipeline_run_id text NOT NULL REFERENCES audit.ingestion_manifest(pipeline_run_id),
+    loaded_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (source_snapshot_date, pipeline_run_id, shape_id, shape_pt_sequence)
+);
+
 CREATE TABLE IF NOT EXISTS staging.stop_times (
     trip_id text NOT NULL,
     arrival_seconds integer NOT NULL CHECK (arrival_seconds >= 0),
@@ -163,6 +176,7 @@ ALTER TABLE staging.agency OWNER TO :"ingestion_user";
 ALTER TABLE staging.stops OWNER TO :"ingestion_user";
 ALTER TABLE staging.routes OWNER TO :"ingestion_user";
 ALTER TABLE staging.trips OWNER TO :"ingestion_user";
+ALTER TABLE staging.shapes OWNER TO :"ingestion_user";
 ALTER TABLE staging.stop_times OWNER TO :"ingestion_user";
 ALTER TABLE staging.calendar OWNER TO :"ingestion_user";
 ALTER TABLE staging.calendar_dates OWNER TO :"ingestion_user";

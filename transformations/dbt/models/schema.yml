@@ -85,6 +85,19 @@ models:
       - name: stop_events
         tests: [not_null]
 
+  - name: dashboard_route_shape
+    description: Official GTFS route geometry retained point-by-point for interactive maps.
+    columns:
+      - name: route_shape_point_sk
+        tests: [not_null, unique]
+      - name: route_sk
+        tests:
+          - relationships:
+              to: ref('dim_route')
+              field: route_sk
+      - name: shape_pt_sequence
+        tests: [not_null]
+
   - name: fact_network_change
     description: Added, removed, and modified entities between consecutive snapshots.
     columns:

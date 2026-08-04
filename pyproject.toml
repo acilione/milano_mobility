@@ -40,7 +40,7 @@ package-dir = { "" = "ingestion" }
 where = ["ingestion"]
 
 [tool.setuptools.package-data]
-milano_mobility = ["static/*.html"]
+milano_mobility = ["static/*.html", "static/dist/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

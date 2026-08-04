@@ -47,8 +47,9 @@ dashboard running at <http://localhost:8501>. Repeating the command with an unch
 returns `SKIPPED` instead of loading the same payload twice.
 
 The dashboard includes service volume, route coverage, network changes, and an interactive
-stop map. Drag or zoom the map, then select a stop to see its scheduled calls and highlight
-every route serving it.
+MapLibre stop map. Stops are clustered for smooth navigation; select one to see its
+scheduled calls and draw every official GTFS route shape serving it. The TypeScript map is
+compiled inside the Docker image, so running the project does not require Node.js locally.
 
 Stop the services without deleting their data with:
 
@@ -82,6 +83,7 @@ The main directories follow the data flow:
 
 ```text
 ingestion/             Fetching, validation, storage, loading, and the dashboard server
+frontend/              TypeScript MapLibre renderer and its pinned build configuration
 orchestration/dags/    Airflow schedules and backfills
 transformations/dbt/   Staging, history, facts, aggregates, and data tests
 infrastructure/        Local PostgreSQL setup and cloud reference infrastructure
