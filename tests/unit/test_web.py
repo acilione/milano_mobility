@@ -3,11 +3,26 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import psycopg
 import pytest
 
 from milano_mobility import web
+from milano_mobility.models import ManifestStatus
+
+
+def refresh_state() -> dict[str, object]:
+    return {
+        "state": "idle",
+        "stage": "idle",
+        "progress": 0,
+        "message": "Ready",
+        "pipeline_run_id": None,
+        "snapshot_date": None,
+        "started_at": None,
+        "completed_at": None,
+    }
 
 
 def test_dashboard_uses_bi_reader_environment(
@@ -128,3 +143,183 @@ def test_dashboard_shell_contains_primary_visuals() -> None:
     assert 'createMap("network-map"' in web.DASHBOARD_HTML
     assert "connected routes" in web.DASHBOARD_HTML
     assert "/api/dashboard" in web.DASHBOARD_HTML
+    assert 'id="refresh-data"' in web.DASHBOARD_HTML
+    assert 'id="refresh-bar"' in web.DASHBOARD_HTML
+    assert "/api/refresh/cancel" in web.DASHBOARD_HTML
+    assert "Cancel update" in web.DASHBOARD_HTML
+    assert "trend-tooltip" in web.DASHBOARD_HTML
+    assert "trend-axis" in web.DASHBOARD_HTML
+    assert "From source to evidence" not in web.DASHBOARD_HTML
+    assert "Version-aware" not in web.DASHBOARD_HTML
+
+
+def test_refresh_status_is_an_isolated_copy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(web, "_REFRESH_STATE", refresh_state())
+
+    status = web.refresh_status()
+    status["state"] = "changed outside"
+
+    assert web.refresh_status()["state"] == "idle"
+
+
+@pytest.mark.parametrize(
+    ("pipeline_status", "expected_state"),
+    [
+        (ManifestStatus.PUBLISHED, "succeeded"),
+        (ManifestStatus.SKIPPED, "unchanged"),
+    ],
+)
+def test_background_refresh_publishes_terminal_state(
+    monkeypatch: pytest.MonkeyPatch,
+    pipeline_status: ManifestStatus,
+    expected_state: str,
+) -> None:
+    monkeypatch.setattr(web, "_REFRESH_STATE", refresh_state())
+    monkeypatch.setattr(
+        web,
+        "Settings",
+        lambda: SimpleNamespace(
+            source_url="https://example.test/latest.zip", service_timezone="UTC"
+        ),
+    )
+
+    def run_pipeline(*args: object, **kwargs: object) -> SimpleNamespace:
+        assert args[0] == "https://example.test/latest.zip"
+        assert kwargs["build_warehouse"] is True
+        kwargs["progress_callback"]("modeling", 80, "Building models")
+        return SimpleNamespace(status=pipeline_status)
+
+    monkeypatch.setattr(web, "_execute_pipeline", run_pipeline)
+
+    web._run_refresh("run-1")
+
+    status = web.refresh_status()
+    assert status["state"] == expected_state
+    assert status["progress"] == 100
+    assert status["completed_at"] is not None
+
+
+def test_background_refresh_reports_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(web, "_REFRESH_STATE", refresh_state())
+    monkeypatch.setattr(
+        web,
+        "Settings",
+        lambda: SimpleNamespace(source_url="", service_timezone="UTC"),
+    )
+
+    web._run_refresh("run-2")
+
+    status = web.refresh_status()
+    assert status["state"] == "failed"
+    assert status["stage"] == "failed"
+    assert "GTFS_SOURCE_URL" in str(status["message"])
+
+
+def test_background_refresh_reports_cancellation(monkeypatch: pytest.MonkeyPatch) -> None:
+    cancellation = web.Event()
+    cancellation.set()
+    monkeypatch.setattr(web, "_REFRESH_STATE", refresh_state())
+    monkeypatch.setattr(web, "_REFRESH_CANCEL", cancellation)
+    monkeypatch.setattr(
+        web,
+        "Settings",
+        lambda: SimpleNamespace(
+            source_url="https://example.test/latest.zip", service_timezone="UTC"
+        ),
+    )
+
+    def run_pipeline(*_: object, **kwargs: object) -> SimpleNamespace:
+        kwargs["progress_callback"]("downloading", 12, "Downloading")
+        raise AssertionError("the cancellation callback should stop the pipeline")
+
+    monkeypatch.setattr(web, "_execute_pipeline", run_pipeline)
+
+    web._run_refresh("run-cancelled")
+
+    status = web.refresh_status()
+    assert status["state"] == "cancelled"
+    assert "published snapshot was not changed" in str(status["message"])
+
+
+def test_start_refresh_rejects_concurrent_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = refresh_state()
+    state["state"] = "running"
+    monkeypatch.setattr(web, "_REFRESH_STATE", state)
+
+    started, returned_state = web.start_refresh()
+
+    assert started is False
+    assert returned_state["state"] == "running"
+
+
+def test_start_refresh_launches_background_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = refresh_state()
+    started_threads: list[tuple[object, tuple[object, ...]]] = []
+    monkeypatch.setattr(web, "_REFRESH_STATE", state)
+    monkeypatch.setattr(
+        web,
+        "Settings",
+        lambda: SimpleNamespace(
+            source_url="https://example.test/latest.zip", service_timezone="UTC"
+        ),
+    )
+
+    class FakeThread:
+        def __init__(self, *, target: object, args: tuple[object, ...], **_: object) -> None:
+            self.target = target
+            self.args = args
+
+        def start(self) -> None:
+            started_threads.append((self.target, self.args))
+
+    monkeypatch.setattr(web, "Thread", FakeThread)
+
+    started, returned_state = web.start_refresh()
+
+    assert started is True
+    assert returned_state["state"] == "running"
+    assert returned_state["progress"] == 1
+    assert started_threads[0][0] is web._run_refresh
+
+
+def test_cancel_refresh_signals_active_download(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = refresh_state()
+    state.update(state="running", stage="downloading", progress=15)
+    cancellation = web.Event()
+    monkeypatch.setattr(web, "_REFRESH_STATE", state)
+    monkeypatch.setattr(web, "_REFRESH_CANCEL", cancellation)
+
+    cancelled, returned_state = web.cancel_refresh()
+
+    assert cancelled is True
+    assert cancellation.is_set()
+    assert returned_state["stage"] == "cancelling"
+
+
+def test_cancel_refresh_rejects_non_download_stage(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = refresh_state()
+    state.update(state="running", stage="modeling", progress=80)
+    monkeypatch.setattr(web, "_REFRESH_STATE", state)
+
+    cancelled, returned_state = web.cancel_refresh()
+
+    assert cancelled is False
+    assert returned_state["stage"] == "modeling"
+
+
+def test_refresh_status_endpoint_returns_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    handler = object.__new__(web.DashboardHandler)
+    sent: list[tuple[object, object, str]] = []
+    monkeypatch.setattr(handler, "path", "/api/refresh", raising=False)
+    monkeypatch.setattr(
+        handler,
+        "_send",
+        lambda status, body, content_type: sent.append((status, body, content_type)),
+    )
+    monkeypatch.setattr(web, "_REFRESH_STATE", refresh_state())
+
+    handler.do_GET()
+
+    assert sent[0][0] == 200
+    assert '"state": "idle"' in str(sent[0][1])
+    assert sent[0][2] == "application/json"

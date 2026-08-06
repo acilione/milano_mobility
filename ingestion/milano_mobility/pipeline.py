@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import tempfile
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -49,23 +49,51 @@ def configure_logging() -> None:
     wait=wait_exponential(multiplier=1, max=8),
     reraise=True,
 )
-def _download(url: str, target: Path, timeout: int) -> tuple[str | None, str | None]:
+def _download(
+    url: str,
+    target: Path,
+    timeout: int,
+    on_progress: Callable[[int, int | None], None] | None = None,
+) -> tuple[str | None, str | None]:
     with requests.get(url, stream=True, timeout=timeout) as response:
         response.raise_for_status()
+        total_header = response.headers.get("Content-Length")
+        total = int(total_header) if total_header else None
+        downloaded = 0
         with target.open("wb") as handle:
             for chunk in response.iter_content(chunk_size=1024 * 1024):
                 handle.write(chunk)
+                downloaded += len(chunk)
+                if on_progress:
+                    on_progress(downloaded, total)
+        return response.headers.get("ETag"), response.headers.get("Last-Modified")
+
+
+@retry(
+    retry=retry_if_exception_type((requests.Timeout, requests.ConnectionError)),
+    stop=stop_after_attempt(4),
+    wait=wait_exponential(multiplier=1, max=8),
+    reraise=True,
+)
+def _source_metadata(url: str, timeout: int) -> tuple[str | None, str | None]:
+    """Read HTTP validators without transferring the feed body."""
+    with requests.head(url, allow_redirects=True, timeout=timeout) as response:
+        response.raise_for_status()
         return response.headers.get("ETag"), response.headers.get("Last-Modified")
 
 
 @contextmanager
-def local_feed(source: str | Path, timeout: int) -> Iterator[tuple[Path, str | None, str | None]]:
+def local_feed(
+    source: str | Path,
+    timeout: int,
+    on_progress: Callable[[int, int | None], None] | None = None,
+) -> Iterator[tuple[Path, str | None, str | None]]:
     """Resolve an HTTP or local source to a temporary, seekable ZIP file."""
     source_text = str(source)
     with tempfile.TemporaryDirectory(prefix="milano-mobility-") as directory:
         target = Path(directory) / "feed.zip"
         if source_text.startswith(("http://", "https://")):
-            etag, last_modified = _download(source_text, target, timeout)
+            etag, last_modified = _download(source_text, target, timeout, on_progress)
         else:
             source_path = Path(source).expanduser().resolve()
             if not source_path.is_file():
@@ -83,23 +111,67 @@ def run_pipeline(
     settings: Settings | None = None,
     pipeline_run_id: str | None = None,
     build_warehouse: bool = False,
+    progress_callback: Callable[[str, int, str], None] | None = None,
 ) -> PipelineResult:
     """Archive, validate, stage, and optionally publish one GTFS snapshot."""
     runtime = settings or Settings()
     run_id = pipeline_run_id or str(uuid.uuid4())
     database = Database(runtime.postgres_dsn)
+    configure_logging()
+    started = datetime.now(timezone.utc)
+
+    def notify(stage: str, progress: int, message: str) -> None:
+        if progress_callback:
+            progress_callback(stage, progress, message)
+
+    def download_progress(downloaded: int, total: int | None) -> None:
+        progress = 8 if not total else 5 + min(25, int(downloaded / total * 25))
+        size = f"{downloaded / 1024 / 1024:.1f} MB"
+        if total:
+            size += f" of {total / 1024 / 1024:.1f} MB"
+        notify("downloading", progress, f"Downloading official GTFS · {size}")
+
+    notify("checking", 2, "Checking the official source for a newer snapshot")
+    feed_text = str(feed)
+    if feed_text.startswith(("http://", "https://")):
+        try:
+            etag, last_modified = _source_metadata(feed_text, runtime.request_timeout_seconds)
+            existing_version = database.find_source_version(
+                runtime.source_name,
+                etag,
+                None if etag else last_modified,
+            )
+            if existing_version:
+                logger.info(
+                    "source_version_already_downloaded",
+                    pipeline_run_id=run_id,
+                    duplicate_of=existing_version["pipeline_run_id"],
+                    http_etag=etag,
+                    http_last_modified=last_modified,
+                )
+                notify("unchanged", 100, "The latest snapshot is already downloaded")
+                return PipelineResult(
+                    pipeline_run_id=run_id,
+                    status=ManifestStatus.SKIPPED,
+                    sha256=str(existing_version["sha256"]),
+                    object_uri=str(existing_version["object_uri"]),
+                    row_counts={},
+                    validation_status="skipped",
+                )
+        except requests.RequestException as error:
+            logger.warning("source_metadata_unavailable", reason=str(error))
+
     object_store = ObjectStore(runtime)
     object_store.ensure_buckets(
         (runtime.raw_bucket, runtime.quarantine_bucket, runtime.curated_bucket)
     )
-    configure_logging()
-    started = datetime.now(timezone.utc)
-
-    with local_feed(feed, runtime.request_timeout_seconds) as (
+    notify("starting", 3, "Preparing the latest official snapshot")
+    with local_feed(feed, runtime.request_timeout_seconds, download_progress) as (
         local_path,
         etag,
         last_modified,
     ):
+        notify("verifying", 32, "Verifying the downloaded archive")
         digest = file_sha256(local_path)
         existing = database.find_duplicate(runtime.source_name, digest)
         if existing:
@@ -109,6 +181,7 @@ def run_pipeline(
                 duplicate_of=existing["pipeline_run_id"],
                 sha256=digest,
             )
+            notify("unchanged", 100, "The downloaded snapshot is already published")
             return PipelineResult(
                 pipeline_run_id=run_id,
                 status=ManifestStatus.SKIPPED,
@@ -145,6 +218,7 @@ def run_pipeline(
         database.register_manifest(manifest)
         object_store.put_json(runtime.raw_bucket, f"{prefix}/manifest.json", manifest.to_dict())
 
+        notify("validating", 40, "Validating the complete GTFS feed")
         report = validate_feed(
             local_path,
             run_id,
@@ -178,10 +252,12 @@ def run_pipeline(
                 f"s3://{runtime.curated_bucket}/{report_key}"
             )
 
+        notify("loading", 55, "Loading the validated snapshot into PostgreSQL")
         row_counts = database.load_staging(local_path, snapshot_date, run_id)
         database.update_status(run_id, ManifestStatus.VALIDATED, report.status)
         final_status = ManifestStatus.VALIDATED
         if build_warehouse:
+            notify("modeling", 80, "Building and testing the analytical models")
             try:
                 _run_dbt()
             except subprocess.CalledProcessError as error:
@@ -194,6 +270,8 @@ def run_pipeline(
                 raise
             database.update_status(run_id, ManifestStatus.PUBLISHED, report.status)
             final_status = ManifestStatus.PUBLISHED
+
+        notify("published", 100, "The latest snapshot is ready")
 
         duration = (datetime.now(timezone.utc) - started).total_seconds()
         logger.info(

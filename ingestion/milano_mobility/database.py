@@ -129,8 +129,11 @@ class Database:
                 WHERE source = %s
                   AND status IN ('VALIDATED', 'PUBLISHED', 'SKIPPED')
                   AND (
-                      (%s IS NOT NULL AND http_etag = %s)
-                      OR (%s IS NOT NULL AND http_last_modified = %s)
+                      (%s::text IS NOT NULL AND http_etag = %s::text)
+                      OR (
+                          %s::text IS NULL
+                          AND http_last_modified = %s::text
+                      )
                   )
                 ORDER BY retrieved_at DESC
                 LIMIT 1
@@ -139,7 +142,7 @@ class Database:
                     source,
                     http_etag,
                     http_etag,
-                    http_last_modified,
+                    http_etag,
                     http_last_modified,
                 ),
             ).fetchone()

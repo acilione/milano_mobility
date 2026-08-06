@@ -27,6 +27,15 @@
     .status{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:13px}.pulse{width:8px;height:8px;
       border-radius:50%;background:var(--amber);box-shadow:0 0 0 5px rgba(255,196,92,.1)}
     .pulse.ready{background:var(--mint);box-shadow:0 0 0 5px rgba(72,227,181,.1)}
+    .nav-actions{display:flex;align-items:center;gap:16px}.refresh-button{border:1px solid rgba(200,255,99,.35);background:rgba(200,255,99,.08);
+      color:var(--lime);border-radius:9px;padding:8px 13px;font-size:12px;font-weight:750;cursor:pointer;transition:.2s ease}
+    .refresh-button:hover:not(:disabled){background:rgba(200,255,99,.16);transform:translateY(-1px)}.refresh-button:disabled{cursor:wait;opacity:.65}
+    .refresh-button.cancel{color:var(--coral);border-color:rgba(255,122,102,.42);background:rgba(255,122,102,.08)}
+    .refresh-button.cancel:hover:not(:disabled){background:rgba(255,122,102,.16)}
+    .refresh-progress{margin:12px 0 0 auto;width:min(100%,480px)}.refresh-copy{display:flex;justify-content:space-between;gap:16px;
+      color:var(--muted);font-size:11px;margin-bottom:6px}.refresh-copy strong{color:var(--ink)}.refresh-track{height:4px;border-radius:99px;
+      overflow:hidden;background:rgba(217,240,226,.1)}.refresh-track i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--mint),var(--lime));
+      border-radius:inherit;transition:width .3s ease}
     header{padding:64px 0 40px;display:grid;grid-template-columns:1.6fr .8fr;gap:50px;align-items:end}
     .eyebrow{color:var(--lime);font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
     h1{font-size:clamp(44px,6vw,86px);line-height:.97;letter-spacing:-.065em;max-width:900px;margin:16px 0 24px;font-weight:770}
@@ -48,7 +57,11 @@
       position:relative;transition:.25s ease}.bar:hover{filter:brightness(1.15);transform:translateY(-2px)}
     .bar:hover:before{content:attr(data-value);position:absolute;top:-29px;left:50%;transform:translateX(-50%);background:var(--ink);
       color:var(--bg);border-radius:5px;padding:3px 6px;font-size:11px;font-weight:800}.hour{font-size:10px;color:var(--muted);margin-top:8px}
-    #trend{width:100%;height:235px;overflow:visible}.mode-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+    .trend-wrap{height:245px;position:relative}.trend-wrap svg{width:100%;height:100%;overflow:visible}.trend-grid{stroke:var(--line);stroke-width:1}
+    .trend-axis{fill:var(--muted);font-size:10px}.trend-hit{fill:transparent;cursor:crosshair}.trend-point{fill:var(--bg);stroke:var(--lime);stroke-width:2;
+      pointer-events:none}.trend-tooltip{position:absolute;z-index:4;pointer-events:none;transform:translate(-50%,-115%);background:var(--ink);color:var(--bg);
+      border-radius:7px;padding:6px 9px;font-size:11px;font-weight:750;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+    .mode-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
     .mode-summary span{color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:5px 10px;font-size:11px}
     .route-list{display:grid;gap:10px;max-height:490px;overflow-y:auto;padding-right:8px;scrollbar-color:var(--mint) transparent}
     .route{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;padding:12px 8px;border-bottom:1px solid var(--line);
@@ -73,25 +86,24 @@
     .route-chip i{width:9px;height:9px;border-radius:50%}.change-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .change{padding:16px;border:1px solid var(--line);border-radius:12px}.change .entity{color:var(--muted);text-transform:capitalize;font-size:12px}
     .change strong{font-size:29px;display:block;margin:5px 0}.change .split{display:flex;gap:8px;flex-wrap:wrap;font-size:10px;text-transform:uppercase}
-    .added{color:var(--mint)}.modified{color:var(--amber)}.removed{color:var(--coral)}.pipeline{display:grid;grid-template-columns:repeat(5,1fr);
-      align-items:center;gap:16px;padding:18px 4px 2px}.stage{position:relative;padding:16px;border:1px solid var(--line);border-radius:12px;min-height:100px}
-    .stage:not(:last-child):after{content:"\2192";position:absolute;right:-14px;top:36%;color:var(--lime);font-size:18px}.stage b{display:block;
-      color:var(--lime);font-size:11px;letter-spacing:.08em;margin-bottom:7px}.stage span{font-weight:700}.stage small{display:block;color:var(--muted);margin-top:5px}
+    .added{color:var(--mint)}.modified{color:var(--amber)}.removed{color:var(--coral)}
     .waiting{grid-column:1/-1;padding:70px 30px;text-align:center;border:1px dashed rgba(200,255,99,.3);border-radius:18px}
     .waiting-orbit{width:58px;height:58px;border:1px solid var(--line);border-top-color:var(--lime);border-radius:50%;margin:0 auto 22px;
       animation:spin 1.2s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}footer{padding:38px 0 50px;display:flex;justify-content:space-between;
       color:var(--muted);font-size:12px}footer a{color:inherit}
-    @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.dashboard-grid{grid-template-columns:1fr}.panel.wide{grid-column:auto}
-      .pipeline{grid-template-columns:1fr}.stage:not(:last-child):after{content:"\2193";right:50%;top:auto;bottom:-18px}}
+    @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.dashboard-grid{grid-template-columns:1fr}.panel.wide{grid-column:auto}}
     @media(max-width:760px){.shell{width:min(100% - 24px,1440px)}header{grid-template-columns:1fr;padding-top:40px}.snapshot{border-left:0;
       border-top:1px solid var(--line);padding:20px 0 0}.kpis{grid-template-columns:1fr 1fr}.panel{padding:18px}.map-layout{grid-template-columns:1fr}
-      .map{height:390px}.change-grid{grid-template-columns:1fr}footer{display:block}.brand-copy{display:none}}
+      .map{height:390px}.change-grid{grid-template-columns:1fr}footer{display:block}.brand-copy{display:none}.nav-actions{gap:9px}.status{display:none}}
   </style>
 </head>
 <body>
   <div class="shell">
     <nav><div class="brand"><div class="brand-mark"></div><span class="brand-copy" id="brand">Mobility Observatory</span></div>
-      <div class="status"><i class="pulse" id="pulse"></i><span id="status">Connecting to published marts</span></div></nav>
+      <div class="nav-actions"><div class="status"><i class="pulse" id="pulse"></i><span id="status">Connecting to published marts</span></div>
+        <button class="refresh-button" id="refresh-data" type="button">Update data</button></div></nav>
+    <div class="refresh-progress" id="refresh-progress" hidden aria-live="polite"><div class="refresh-copy"><span id="refresh-message"></span>
+      <strong id="refresh-percent">0%</strong></div><div class="refresh-track"><i id="refresh-bar"></i></div></div>
     <header><div><div class="eyebrow" id="eyebrow">Scheduled transport intelligence</div><h1>See the network.<br><em>Read the rhythm.</em></h1>
       <div class="lede" id="lede">A quality-controlled view of scheduled public transport.</div></div>
       <div class="snapshot"><span>Source snapshot</span><strong id="snapshot">Preparing data</strong><small id="generated">The page refreshes automatically</small></div></header>
@@ -103,16 +115,20 @@
     import {createMap} from "/assets/map.js";
     const fmt=n=>new Intl.NumberFormat(undefined).format(Number(n||0));
     const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-    const attr=esc;let currentSnapshot=null,refreshTimer=null,mapController=null;
+    const attr=esc;let currentSnapshot=null,refreshTimer=null,refreshPollTimer=null,mapController=null,lastCompletedRefresh=null;
     const modeName=type=>({0:"tram",1:"metro",2:"rail",3:"bus / trolleybus",4:"ferry"}[type]||"other");
     const routeName=r=>+r.route_type===1&&!String(r.route_name).toUpperCase().startsWith("M")?`M${r.route_name}`:String(r.route_name||"");
     const routeColor=r=>/^[0-9a-fA-F]{6}$/.test(r.route_color||"")?`#${r.route_color}`:+r.route_type===0?"#ffc45c":+r.route_type===1?"#c8ff63":"#68b5ff";
     const metric=(label,value,note)=>`<article class="card"><span class="label">${label}</span><strong class="value">${fmt(value)}</strong><span class="note">${note}</span></article>`;
     function hourly(rows){const max=Math.max(...rows.map(x=>+x.departures),1);return `<div class="chart">${rows.map(x=>`<div class="bar-wrap"><div class="bar" data-value="${fmt(x.departures)}" style="height:${Math.max(3,+x.departures/max*100)}%"></div><span class="hour">${String(x.service_hour).padStart(2,"0")}:00</span></div>`).join("")}</div>`}
-    function trend(rows){const width=760,height=215,pad=20,max=Math.max(...rows.map(x=>+x.scheduled_trips),1);
-      const pts=rows.map((x,i)=>({x:pad+i*(width-pad*2)/Math.max(rows.length-1,1),y:height-pad-(+x.scheduled_trips/max)*(height-pad*2),v:+x.scheduled_trips,d:x.service_date}));
-      const line=pts.map((p,i)=>`${i?"L":"M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "),area=`${line} L${pts.at(-1)?.x||pad},${height-pad} L${pad},${height-pad} Z`;
-      return `<svg id="trend" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#48e3b5" stop-opacity=".35"/><stop offset="1" stop-color="#48e3b5" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#fade)"/><path d="${line}" fill="none" stroke="#c8ff63" stroke-width="3" vector-effect="non-scaling-stroke"/>${pts.filter((_,i)=>i%Math.max(1,Math.ceil(pts.length/9))===0).map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3" fill="#07110f" stroke="#c8ff63" stroke-width="2"><title>${p.d}: ${fmt(p.v)} trips</title></circle>`).join("")}</svg>`}
+    function trend(rows){const width=900,height=245,margin={top:12,right:14,bottom:38,left:58},plotW=width-margin.left-margin.right,plotH=height-margin.top-margin.bottom;
+      const max=Math.max(...rows.map(x=>+x.scheduled_trips),1),pts=rows.map((x,i)=>({x:margin.left+i*plotW/Math.max(rows.length-1,1),y:margin.top+(1-(+x.scheduled_trips/max))*plotH,v:+x.scheduled_trips,d:x.service_date}));
+      const line=pts.map((p,i)=>`${i?"L":"M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" "),area=`${line} L${pts.at(-1)?.x||margin.left},${margin.top+plotH} L${margin.left},${margin.top+plotH} Z`;
+      const yTicks=Array.from({length:5},(_,i)=>({value:max*i/4,y:margin.top+plotH-i*plotH/4})),tickStep=Math.max(1,Math.ceil(rows.length/6));
+      const xTicks=rows.filter((_,i)=>i===0||i===rows.length-1||i%tickStep===0),dateLabel=value=>new Date(`${value}T00:00:00`).toLocaleDateString(undefined,{day:"2-digit",month:"short"});
+      return `<div class="trend-wrap"><svg id="trend" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Scheduled trips by service date"><defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#48e3b5" stop-opacity=".35"/><stop offset="1" stop-color="#48e3b5" stop-opacity="0"/></linearGradient></defs>${yTicks.map(t=>`<line class="trend-grid" x1="${margin.left}" y1="${t.y}" x2="${width-margin.right}" y2="${t.y}"/><text class="trend-axis" x="${margin.left-9}" y="${t.y+3}" text-anchor="end">${fmt(Math.round(t.value))}</text>`).join("")}${xTicks.map(row=>{const p=pts[rows.indexOf(row)];return `<text class="trend-axis" x="${p.x}" y="${height-12}" text-anchor="middle">${dateLabel(row.service_date)}</text>`}).join("")}<path d="${area}" fill="url(#fade)"/><path d="${line}" fill="none" stroke="#c8ff63" stroke-width="3" vector-effect="non-scaling-stroke"/>${pts.map(p=>`<circle class="trend-point" cx="${p.x}" cy="${p.y}" r="2.5" vector-effect="non-scaling-stroke"/><circle class="trend-hit" cx="${p.x}" cy="${p.y}" r="8" data-date="${attr(p.d)}" data-value="${p.v}"/>`).join("")}</svg><div class="trend-tooltip" id="trend-tooltip" hidden></div></div>`}
+    function initTrend(){const wrap=document.querySelector(".trend-wrap"),tip=document.querySelector("#trend-tooltip");if(!wrap||!tip)return;
+      wrap.querySelectorAll(".trend-hit").forEach(point=>{point.addEventListener("pointerenter",()=>{tip.textContent=`${new Date(`${point.dataset.date}T00:00:00`).toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})} · ${fmt(point.dataset.value)} scheduled trips`;tip.hidden=false});point.addEventListener("pointermove",event=>{const box=wrap.getBoundingClientRect();tip.style.left=`${event.clientX-box.left}px`;tip.style.top=`${event.clientY-box.top}px`});point.addEventListener("pointerleave",()=>tip.hidden=true)})}
     function routes(rows){const counts={};rows.forEach(r=>counts[r.route_type]=(counts[r.route_type]||0)+1);
       const summary=Object.entries(counts).map(([type,count])=>`<span>${fmt(count)} ${modeName(type)} routes</span>`).join("");
       return `<div class="mode-summary">${summary}</div><div class="route-list" id="route-list">${rows.map(r=>`<div class="route" data-route="${attr(r.route_sk)}"><div class="route-badge" style="background:${routeColor(r)}">${esc(routeName(r))}</div><div><strong>${esc(r.route_long_name||"Scheduled route")}</strong><small>${fmt(r.trips)} scheduled trips</small></div><div class="route-metric">${fmt(r.served_stops)}<small>served stops</small></div></div>`).join("")}</div>`}
@@ -137,9 +153,16 @@
         <article class="panel"><div class="panel-head"><div><h2>Route coverage</h2><p>Distinct scheduled stops by line.</p></div><span class="tag">Network</span></div>${routes(d.route_coverage)}</article>
         <article class="panel wide"><div class="panel-head"><div><h2>Scheduled service calendar</h2><p>Daily trip volume across the published window.</p></div><span class="tag">${fmt(d.service_days.length)} days</span></div>${trend(d.service_days)}</article>
         <article class="panel wide"><div class="panel-head"><div><h2>Interactive stop map</h2><p>Pan, zoom, and select any stop to inspect its routes.</p></div><span class="tag">${fmt(d.stops.length)} stops</span></div>${mapMarkup(d.stops)}</article>
-        <article class="panel"><div class="panel-head"><div><h2>Network change ledger</h2><p>Changes between published GTFS snapshots.</p></div><span class="tag">Version-aware</span></div>${changes(d.changes)}</article>
-        <article class="panel"><div class="panel-head"><div><h2>From source to evidence</h2><p>The same observable path produces every metric.</p></div><span class="tag">Lineage</span></div><div class="pipeline"><div class="stage"><b>01 / ARCHIVE</b><span>GTFS snapshot</span><small>Immutable source object</small></div><div class="stage"><b>02 / VALIDATE</b><span>Quality gate</span><small>Schema, keys, times</small></div><div class="stage"><b>03 / MODEL</b><span>dbt warehouse</span><small>History and facts</small></div><div class="stage"><b>04 / TEST</b><span>Automated checks</span><small>Relationships and rules</small></div><div class="stage"><b>05 / OBSERVE</b><span>Visual mart</span><small>Read-only access</small></div></div></article></section>`;initMap(d.stops)}
-    async function refresh(){try{const response=await fetch("/api/dashboard",{cache:"no-store"}),data=await response.json();render(data);clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,Math.max(5,+data.meta.refresh_seconds||30)*1000)}catch(error){document.querySelector("#status").textContent="Reconnecting to dashboard API";clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,5000)}}refresh();
+        <article class="panel wide"><div class="panel-head"><div><h2>Network change ledger</h2><p>Changes between published GTFS snapshots.</p></div></div>${changes(d.changes)}</article></section>`;initTrend();initMap(d.stops)}
+    function renderRefresh(state){const running=state.state==="running",cancellable=running&&["starting","checking","downloading"].includes(state.stage),button=document.querySelector("#refresh-data"),progress=document.querySelector("#refresh-progress");
+      button.dataset.action=cancellable?"cancel":"update";button.classList.toggle("cancel",cancellable);button.disabled=running&&!cancellable;button.textContent=cancellable?"Cancel update":running?"Cancelling…":"Update data";progress.hidden=state.state==="idle";document.querySelector("#refresh-message").textContent=state.message||"Preparing snapshot";
+      document.querySelector("#refresh-percent").textContent=`${Math.max(0,Math.min(100,+state.progress||0))}%`;document.querySelector("#refresh-bar").style.width=`${Math.max(0,Math.min(100,+state.progress||0))}%`;
+      if(running)document.querySelector("#status").textContent="Updating snapshot in the background";
+      if(!running&&["succeeded","unchanged"].includes(state.state)&&state.pipeline_run_id!==lastCompletedRefresh){lastCompletedRefresh=state.pipeline_run_id;currentSnapshot=null;refresh()}}
+    async function pollRefresh(){try{const response=await fetch("/api/refresh",{cache:"no-store"}),state=await response.json();renderRefresh(state);clearTimeout(refreshPollTimer);if(state.state==="running")refreshPollTimer=setTimeout(pollRefresh,800)}catch(error){clearTimeout(refreshPollTimer);refreshPollTimer=setTimeout(pollRefresh,3000)}}
+    document.querySelector("#refresh-data").addEventListener("click",async()=>{const button=document.querySelector("#refresh-data"),cancelling=button.dataset.action==="cancel";button.disabled=true;button.textContent=cancelling?"Cancelling…":"Checking…";
+      try{const response=await fetch(cancelling?"/api/refresh/cancel":"/api/refresh",{method:"POST",headers:{"X-Mobility-Action":cancelling?"cancel":"refresh"}}),state=await response.json();renderRefresh(state);pollRefresh()}catch(error){button.disabled=false;button.textContent=cancelling?"Cancel update":"Try update again"}});
+    async function refresh(){try{const response=await fetch("/api/dashboard",{cache:"no-store"}),data=await response.json();render(data);clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,Math.max(5,+data.meta.refresh_seconds||30)*1000)}catch(error){document.querySelector("#status").textContent="Reconnecting to dashboard API";clearTimeout(refreshTimer);refreshTimer=setTimeout(refresh,5000)}}refresh();pollRefresh();
   </script>
 </body>
 </html>

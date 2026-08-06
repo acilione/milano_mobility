@@ -50,6 +50,11 @@ The dashboard includes service volume, route coverage, network changes, and an i
 MapLibre stop map. Stops are clustered for smooth navigation; select one to see its
 scheduled calls and draw every official GTFS route shape serving it. The TypeScript map is
 compiled inside the Docker image, so running the project does not require Node.js locally.
+Use **Update data** in the dashboard to check the official source. Matching HTTP metadata
+ends the check immediately without downloading the archive; a newer version starts a full
+feed download that can be cancelled from the same button. Progress is shown in the header
+while the last published snapshot remains available, and new data only appears after
+validation and dbt tests finish successfully.
 
 Stop the services without deleting their data with:
 

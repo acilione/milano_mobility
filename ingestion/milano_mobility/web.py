@@ -5,17 +5,24 @@ from __future__ import annotations
 import json
 import os
 import re
+import uuid
+from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
+from threading import Event, Lock, Thread
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
+from zoneinfo import ZoneInfo
 
 import psycopg
 import structlog
 from psycopg.rows import dict_row
+
+from milano_mobility.config import Settings
+from milano_mobility.models import ManifestStatus, PipelineResult
 
 logger = structlog.get_logger()
 STATIC_ROOT = files("milano_mobility").joinpath("static")
@@ -34,6 +41,22 @@ STATIC_ASSETS = {
     "/assets/maplibre-gl.css": ("dist/maplibre-gl.css", "text/css; charset=utf-8"),
 }
 ROUTE_KEY_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+_REFRESH_LOCK = Lock()
+_REFRESH_CANCEL = Event()
+_REFRESH_STATE: dict[str, Any] = {
+    "state": "idle",
+    "stage": "idle",
+    "progress": 0,
+    "message": "Ready to download the latest snapshot",
+    "pipeline_run_id": None,
+    "snapshot_date": None,
+    "started_at": None,
+    "completed_at": None,
+}
+
+
+class RefreshCancelled(RuntimeError):
+    """Raised cooperatively when the dashboard user cancels a feed download."""
 
 
 def _json_default(value: object) -> str:
@@ -78,6 +101,128 @@ def _dashboard_metadata() -> dict[str, str | int]:
     }
 
 
+def refresh_status() -> dict[str, Any]:
+    """Return an isolated copy of the in-process refresh state."""
+    with _REFRESH_LOCK:
+        return dict(_REFRESH_STATE)
+
+
+def _update_refresh(**values: object) -> None:
+    with _REFRESH_LOCK:
+        _REFRESH_STATE.update(values)
+
+
+def _execute_pipeline(
+    feed: str,
+    snapshot_date: date,
+    *,
+    settings: Settings,
+    pipeline_run_id: str,
+    build_warehouse: bool,
+    progress_callback: Callable[[str, int, str], None],
+) -> PipelineResult:
+    """Load the heavier ingestion dependencies only when a refresh starts."""
+    from milano_mobility.pipeline import run_pipeline
+
+    return run_pipeline(
+        feed,
+        snapshot_date,
+        settings=settings,
+        pipeline_run_id=pipeline_run_id,
+        build_warehouse=build_warehouse,
+        progress_callback=progress_callback,
+    )
+
+
+def _run_refresh(run_id: str) -> None:
+    settings = Settings()
+    snapshot_date = datetime.now(ZoneInfo(settings.service_timezone)).date()
+
+    def progress(stage: str, percentage: int, message: str) -> None:
+        if _REFRESH_CANCEL.is_set():
+            raise RefreshCancelled
+        _update_refresh(stage=stage, progress=percentage, message=message)
+
+    try:
+        if not settings.source_url:
+            raise ValueError("GTFS_SOURCE_URL is not configured")
+        result = _execute_pipeline(
+            settings.source_url,
+            snapshot_date,
+            settings=settings,
+            pipeline_run_id=run_id,
+            build_warehouse=True,
+            progress_callback=progress,
+        )
+        unchanged = result.status is ManifestStatus.SKIPPED
+        _update_refresh(
+            state="unchanged" if unchanged else "succeeded",
+            stage="unchanged" if unchanged else "published",
+            progress=100,
+            message=(
+                "The latest snapshot is already downloaded"
+                if unchanged
+                else "The latest snapshot is published"
+            ),
+            completed_at=datetime.now().astimezone().isoformat(),
+        )
+    except RefreshCancelled:
+        _update_refresh(
+            state="cancelled",
+            stage="cancelled",
+            message="The update was cancelled; the published snapshot was not changed",
+            completed_at=datetime.now().astimezone().isoformat(),
+        )
+    except Exception as error:
+        logger.exception("dashboard_refresh_failed", pipeline_run_id=run_id)
+        _update_refresh(
+            state="failed",
+            stage="failed",
+            message=str(error).splitlines()[0] or type(error).__name__,
+            completed_at=datetime.now().astimezone().isoformat(),
+        )
+
+
+def start_refresh() -> tuple[bool, dict[str, Any]]:
+    """Start one background full-feed refresh, rejecting concurrent requests."""
+    with _REFRESH_LOCK:
+        if _REFRESH_STATE["state"] == "running":
+            return False, dict(_REFRESH_STATE)
+        run_id = str(uuid.uuid4())
+        settings = Settings()
+        _REFRESH_CANCEL.clear()
+        _REFRESH_STATE.update(
+            state="running",
+            stage="starting",
+            progress=1,
+            message="Starting the full snapshot download",
+            pipeline_run_id=run_id,
+            snapshot_date=datetime.now(ZoneInfo(settings.service_timezone)).date().isoformat(),
+            started_at=datetime.now().astimezone().isoformat(),
+            completed_at=None,
+        )
+        state = dict(_REFRESH_STATE)
+    Thread(target=_run_refresh, args=(run_id,), name="gtfs-dashboard-refresh", daemon=True).start()
+    return True, state
+
+
+def cancel_refresh() -> tuple[bool, dict[str, Any]]:
+    """Request cancellation while source checking or download is still active."""
+    with _REFRESH_LOCK:
+        cancellable_stages = {"starting", "checking", "downloading"}
+        if (
+            _REFRESH_STATE["state"] != "running"
+            or _REFRESH_STATE["stage"] not in cancellable_stages
+        ):
+            return False, dict(_REFRESH_STATE)
+        _REFRESH_CANCEL.set()
+        _REFRESH_STATE.update(
+            stage="cancelling",
+            message="Cancelling the current download",
+        )
+        return True, dict(_REFRESH_STATE)
+
+
 def _normalize_route_ids(values: list[str]) -> list[str]:
     """Return unique warehouse route keys within a small request bound."""
     return list(dict.fromkeys(value for value in values if ROUTE_KEY_PATTERN.fullmatch(value)))[:50]
@@ -112,7 +257,7 @@ def load_route_shapes(route_ids: list[str]) -> list[dict[str, Any]]:
                         count(*) OVER shape AS point_count
                     FROM marts.dashboard_route_shape
                     WHERE snapshot_date = (
-                        SELECT max(snapshot_date) FROM marts.dashboard_route_shape
+                        SELECT snapshot_date FROM marts.published_snapshot
                     )
                       AND route_sk = ANY(%s)
                     WINDOW shape AS (
@@ -163,8 +308,7 @@ def load_dashboard_data() -> dict[str, Any]:
             summary = connection.execute(
                 """
                 WITH latest_snapshot AS (
-                    SELECT max(snapshot_date) AS snapshot_date
-                    FROM marts.dashboard_service_activity
+                    SELECT snapshot_date FROM marts.published_snapshot
                 )
                 SELECT
                     latest.snapshot_date,
@@ -192,7 +336,7 @@ def load_dashboard_data() -> dict[str, Any]:
                 SELECT service_hour, sum(scheduled_trips) AS departures
                 FROM marts.dashboard_service_activity
                 WHERE snapshot_date = (
-                    SELECT max(snapshot_date) FROM marts.dashboard_service_activity
+                    SELECT snapshot_date FROM marts.published_snapshot
                 )
                   AND service_hour IS NOT NULL
                 GROUP BY 1
@@ -212,10 +356,22 @@ def load_dashboard_data() -> dict[str, Any]:
                 LEFT JOIN marts.dim_weather_day AS weather USING (date_key)
                 LEFT JOIN marts.dashboard_service_activity AS service USING (date_key)
                 WHERE calendar.date BETWEEN
-                    (SELECT min(service_date) FROM marts.dashboard_service_activity)
-                    AND (SELECT max(service_date) FROM marts.dashboard_service_activity)
+                    (
+                        SELECT min(service_date)
+                        FROM marts.dashboard_service_activity
+                        WHERE snapshot_date = (
+                            SELECT snapshot_date FROM marts.published_snapshot
+                        )
+                    )
+                    AND (
+                        SELECT max(service_date)
+                        FROM marts.dashboard_service_activity
+                        WHERE snapshot_date = (
+                            SELECT snapshot_date FROM marts.published_snapshot
+                        )
+                    )
                   AND service.snapshot_date = (
-                      SELECT max(snapshot_date) FROM marts.dashboard_service_activity
+                      SELECT snapshot_date FROM marts.published_snapshot
                   )
                 GROUP BY 1, 2, 3, 4, 5
                 ORDER BY 1
@@ -224,8 +380,7 @@ def load_dashboard_data() -> dict[str, Any]:
             route_coverage = connection.execute(
                 """
                 WITH latest_snapshot AS (
-                    SELECT max(snapshot_date) AS snapshot_date
-                    FROM marts.dashboard_service_activity
+                    SELECT snapshot_date FROM marts.published_snapshot
                 ),
                 service_by_route AS (
                     SELECT route_sk, sum(scheduled_trips) AS trips
@@ -264,7 +419,7 @@ def load_dashboard_data() -> dict[str, Any]:
                 SELECT entity_type, change_type, count(*) AS changed_entities
                 FROM marts.fact_network_change
                 WHERE snapshot_date = (
-                    SELECT max(snapshot_date) FROM marts.fact_network_change
+                    SELECT snapshot_date FROM marts.published_snapshot
                 )
                 GROUP BY 1, 2
                 ORDER BY 1, 2
@@ -273,8 +428,7 @@ def load_dashboard_data() -> dict[str, Any]:
             stops = connection.execute(
                 """
                 WITH latest_snapshot AS (
-                    SELECT max(snapshot_date) AS snapshot_date
-                    FROM marts.dashboard_stop_activity
+                    SELECT snapshot_date FROM marts.published_snapshot
                 ),
                 stop_activity AS (
                     SELECT stop_sk, sum(stop_events) AS stop_events
@@ -354,6 +508,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             payload = json.dumps(load_dashboard_data(), default=_json_default).encode()
             self._send(HTTPStatus.OK, payload, "application/json")
             return
+        if request.path == "/api/refresh":
+            refresh_payload = json.dumps(refresh_status(), default=_json_default)
+            self._send(HTTPStatus.OK, refresh_payload, "application/json")
+            return
         if request.path == "/api/route-shapes":
             route_ids = parse_qs(request.query).get("route_sk", [])
             shape_payload = json.dumps(
@@ -365,6 +523,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send(HTTPStatus.OK, b'{"status":"ok"}', "application/json")
             return
         self._send(HTTPStatus.NOT_FOUND, b'{"error":"not found"}', "application/json")
+
+    def do_POST(self) -> None:
+        request = urlsplit(self.path)
+        if request.path == "/api/refresh/cancel":
+            if self.headers.get("X-Mobility-Action") != "cancel":
+                self._send(
+                    HTTPStatus.FORBIDDEN,
+                    b'{"error":"cancel header required"}',
+                    "application/json",
+                )
+                return
+            cancelled, state = cancel_refresh()
+            payload = json.dumps(state, default=_json_default)
+            self._send(
+                HTTPStatus.ACCEPTED if cancelled else HTTPStatus.CONFLICT,
+                payload,
+                "application/json",
+            )
+            return
+        if request.path != "/api/refresh":
+            self._send(HTTPStatus.NOT_FOUND, b'{"error":"not found"}', "application/json")
+            return
+        if self.headers.get("X-Mobility-Action") != "refresh":
+            self._send(
+                HTTPStatus.FORBIDDEN, b'{"error":"refresh header required"}', "application/json"
+            )
+            return
+        started, state = start_refresh()
+        payload = json.dumps(state, default=_json_default)
+        self._send(
+            HTTPStatus.ACCEPTED if started else HTTPStatus.CONFLICT, payload, "application/json"
+        )
 
     def log_message(self, message_format: str, *args: object) -> None:
         logger.info("dashboard_request", message=message_format % args)

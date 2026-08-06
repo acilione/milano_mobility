@@ -1,6 +1,14 @@
 version: 2
 
 models:
+  - name: published_snapshot
+    description: The last completely built snapshot that dashboard readers may see.
+    columns:
+      - name: snapshot_date
+        tests: [not_null, unique]
+      - name: pipeline_run_id
+        tests: [not_null]
+
   - name: dim_stop_history
     description: Type-2 history for each stop, bounded by source snapshot dates.
     columns:
