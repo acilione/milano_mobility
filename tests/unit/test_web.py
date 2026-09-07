@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -323,3 +324,86 @@ def test_refresh_status_endpoint_returns_json(monkeypatch: pytest.MonkeyPatch) -
     assert sent[0][0] == 200
     assert '"state": "idle"' in str(sent[0][1])
     assert sent[0][2] == "application/json"
+
+
+@pytest.mark.parametrize(
+    ("error", "status"),
+    [(None, 200), (ValueError("Invalid date"), 400), (psycopg.OperationalError("offline"), 503)],
+)
+def test_commute_http_responses(
+    monkeypatch: pytest.MonkeyPatch, error: Exception | None, status: int
+) -> None:
+    handler = object.__new__(web.DashboardHandler)
+    sent: list[tuple[object, object, str]] = []
+    monkeypatch.setattr(handler, "path", "/api/commute?date=2026-09-07", raising=False)
+    monkeypatch.setattr(handler, "_send", lambda *args: sent.append(args))
+
+    def load(query: str) -> dict[str, object]:
+        assert query == "date=2026-09-07"
+        if error:
+            raise error
+        return {"stops": []}
+
+    monkeypatch.setattr(web, "load_commute", load)
+    handler.do_GET()
+    assert sent[0][0] == status
+    assert isinstance(json.loads(str(sent[0][1])), dict)
+
+
+def test_commute_timetable_uses_calendar_offsets_and_run_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    web._commute_timetable.cache_clear()
+    queries: list[str] = []
+
+    class Result:
+        def __init__(self, query: str) -> None:
+            self.query = query
+
+        def fetchone(self) -> dict[str, object]:
+            if "min(service_date)" in self.query:
+                return {"first": date(2026, 9, 1), "last": date(2026, 9, 30)}
+            return {"pipeline_run_id": "run"}
+
+        def fetchall(self) -> list[dict[str, object]]:
+            if "commute_stops" in self.query:
+                return []
+            return [
+                dict(
+                    service_date=date(2026, 9, 6),
+                    trip_id="night",
+                    from_stop="A",
+                    to_stop="B",
+                    departure=-300,
+                    arrival=600,
+                    route_name="N1",
+                    stop_sequence=1,
+                    can_board=True,
+                    can_alight=False,
+                )
+            ]
+
+    class Connection:
+        def __enter__(self) -> Connection:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            pass
+
+        def execute(self, query: str, parameters: object = None) -> Result:
+            queries.append(query)
+            if "SELECT c.*" in query:
+                assert parameters == dict(day=date(2026, 9, 7), run="run", start=-900, end=900)
+            return Result(query)
+
+    monkeypatch.setattr(web.psycopg, "connect", lambda **_: Connection())
+    _, connections = web._commute_timetable("run", date(2026, 9, 7), 900, 1800)
+    assert connections[0].trip == "2026-09-06:night"
+    assert connections[0].departure == -300
+    assert not connections[0].can_alight
+    assert any("s.service_date - %(day)s::date" in query for query in queries)
+    with pytest.raises(ValueError, match="changed"):
+        web._commute_timetable("different", date(2026, 9, 7), 900, 1800)
+    with pytest.raises(ValueError, match="outside"):
+        web._commute_timetable("run", date(2026, 10, 1), 900, 1800)
+    web._commute_timetable.cache_clear()

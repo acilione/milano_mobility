@@ -2,14 +2,21 @@
 
 [![CI](https://github.com/acilione/milano_mobility/actions/workflows/ci.yml/badge.svg)](https://github.com/acilione/milano_mobility/actions/workflows/ci.yml)
 
-Milano Mobility is a small, local-first data platform built around Milan's official public
-transport schedule. Its purpose is to turn a changing GTFS feed into something that is
-easy to trust and explore: an immutable source archive, a tested analytical model, and a
-visual view of the network.
+Milano Mobility helps you explore where you could live within a chosen commute of your
+workplace or university, using Milan's official public transport timetable. Choose a
+destination on the map or search for a stop, pick a travel date and arrival time, and
+compare areas within 15, 30, 45 or 60 minutes. Select a reachable stop to inspect its
+scheduled journey. Destination and travel preferences can be saved in your browser.
 
-The project measures planned service, not live vehicle positions, punctuality, or passenger
-demand. It is meant as a complete and reproducible data-engineering example rather than a
-mock dashboard backed by a few hand-written rows.
+The commute map uses scheduled services, up to two transfers, a two-minute transfer
+allowance, and estimated walking links. Walking uses 4.5 km/h and a 30% distance allowance,
+with a selectable 5, 10 or 15 minute limit per walking leg. Shading uses 100 m cells and
+is an approximate walking catchment, not a street-routed isochrone: barriers, station entrances and
+accessibility are not modeled. Live positions, delays and cancellations are not included.
+Service dates are limited to the published timetable; historical dates are labeled.
+
+Behind the map is a reproducible local-first data platform: an immutable source archive,
+a tested analytical model, and network analytics available below the commute explorer.
 
 ## How it works
 
@@ -55,6 +62,22 @@ ends the check immediately without downloading the archive; a newer version star
 feed download that can be cancelled from the same button. Progress is shown in the header
 while the last published snapshot remains available, and new data only appears after
 validation and dbt tests finish successfully.
+
+For an existing installation, build the new commute tables once, then rebuild the app:
+
+```bash
+docker compose run --rm --entrypoint dbt pipeline build --select commute_connections commute_service commute_stops --project-dir /workspace/transformations/dbt --profiles-dir /workspace/transformations/dbt
+docker compose up -d --build frontend
+```
+
+The commute API (`GET /api/commute`) accepts `lat`, `lon`, `date` (YYYY-MM-DD),
+`time` (HH:MM, Europe/Rome), `minutes` (15/30/45/60), and `walk` (5/10/15).
+It computes latest departures using reverse connection scans, including prior service
+days' after-midnight trips and calendar exceptions. It excludes boarding/alighting that
+requires arrangements or is prohibited. Adjacent connections are materialized once per
+source trip; they are joined to service dates only for the requested travel window.
+An in-memory cache holds up to eight timetable windows keyed by published pipeline run.
+Routing reads through the BI account with a 30-second database statement timeout.
 
 Stop the services without deleting their data with:
 

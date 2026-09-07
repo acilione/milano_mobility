@@ -69,9 +69,25 @@ One changed entity between consecutive snapshots. `entity_type` is `stop`, `rout
 `trip`; `change_type` is `ADDED`, `REMOVED`, or `MODIFIED`. Old/new hashes make the result
 auditable without duplicating wide source rows.
 
+### Commute routing tables
+
+`marts.commute_connections` stores one adjacent pair of calls per source snapshot,
+pipeline run, trip and stop sequence, including departure/arrival seconds, service ID,
+route name, and ordinary boarding/alighting permissions. It is indexed by pipeline run,
+service ID and departure time. It does not expand trips across every service date.
+
+`marts.commute_service` exposes the exception-adjusted service calendar to the BI role.
+`marts.commute_stops` exposes boarding stops for the currently published pipeline run.
+The API reads a consistent snapshot and uses calendar-day offsets for extended GTFS hours.
+
+Commute results contain a latest departure and ordered walking/transit legs per stop.
+`minutes` includes time until the selected arrival deadline (including any arrival margin).
+Leg times are seconds relative to midnight on the selected date; negative times belong
+to the previous calendar day. Walking areas are estimates, not verified pedestrian routes.
+
 ## Universal audit fields
 
-Gold tables expose:
+Analytical gold tables expose:
 
 - `loaded_at`: source staging load timestamp or transformation timestamp.
 - `pipeline_run_id`: ingestion run that introduced the source record.

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime
 from decimal import Decimal
+from functools import lru_cache
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -21,6 +23,7 @@ import psycopg
 import structlog
 from psycopg.rows import dict_row
 
+from milano_mobility.commute import Connection, reachable_stops
 from milano_mobility.config import Settings
 from milano_mobility.models import ManifestStatus, PipelineResult
 
@@ -489,6 +492,107 @@ def load_dashboard_data() -> dict[str, Any]:
         }
 
 
+def _commute_parameters(query: str) -> tuple[date, int, int, int, float, float]:
+    values = parse_qs(query)
+    try:
+        day = date.fromisoformat(values["date"][0])
+        clock = values["time"][0]
+        if not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", clock):
+            raise ValueError
+        hour, minute = map(int, clock.split(":"))
+        budget, walk = int(values["minutes"][0]), int(values["walk"][0])
+        lat, lon = float(values["lat"][0]), float(values["lon"][0])
+        if not (math.isfinite(lat) and math.isfinite(lon)):
+            raise ValueError
+        if not (44.8 <= lat <= 46.2 and 8.3 <= lon <= 10.2):
+            raise ValueError
+        if budget not in (15, 30, 45, 60) or walk not in (5, 10, 15):
+            raise ValueError
+    except (KeyError, ValueError, IndexError) as error:
+        raise ValueError(
+            "Choose a Milan destination, valid date/time, and listed time budgets."
+        ) from error
+    return day, hour * 3600 + minute * 60, budget * 60, walk * 60, lat, lon
+
+
+@lru_cache(maxsize=8)
+def _commute_timetable(
+    run_id: str,
+    day: date,
+    deadline: int,
+    budget: int,
+) -> tuple[list[dict[str, Any]], list[Connection]]:
+    parameters = _database_parameters()
+    with psycopg.connect(**parameters, row_factory=dict_row) as connection:  # type: ignore[arg-type]
+        connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        connection.execute("SET LOCAL statement_timeout = '30s'")
+        published = connection.execute(
+            "SELECT pipeline_run_id FROM marts.published_snapshot"
+        ).fetchone()
+        if not published or published["pipeline_run_id"] != run_id:
+            raise ValueError("The timetable changed. Please calculate again.")
+        available = connection.execute(
+            "SELECT min(service_date) AS first, max(service_date) AS last "
+            "FROM marts.commute_service WHERE pipeline_run_id = %s",
+            (run_id,),
+        ).fetchone()
+        if (
+            not available
+            or not available["first"]
+            or not available["first"] <= day <= available["last"]
+        ):
+            raise ValueError("This date is outside the published timetable. Choose a listed date.")
+        stops = connection.execute("SELECT * FROM marts.commute_stops").fetchall()
+        rows = connection.execute(
+            """
+            SELECT c.*, s.service_date,
+                c.departure_seconds + (s.service_date - %(day)s::date) * 86400 AS departure,
+                c.arrival_seconds + (s.service_date - %(day)s::date) * 86400 AS arrival
+            FROM marts.commute_service s
+            JOIN marts.commute_connections c USING (pipeline_run_id, service_id)
+            WHERE s.pipeline_run_id = %(run)s AND s.service_date <= %(day)s::date
+              AND c.departure_seconds >= %(start)s - (s.service_date - %(day)s::date) * 86400
+              AND c.departure_seconds <= %(end)s - (s.service_date - %(day)s::date) * 86400
+              AND c.arrival_seconds <= %(end)s - (s.service_date - %(day)s::date) * 86400
+            """,
+            {"day": day, "run": run_id, "start": deadline - budget, "end": deadline},
+        ).fetchall()
+    return stops, [
+        Connection(
+            trip=f"{r['service_date']}:{r['trip_id']}",
+            origin=r["from_stop"],
+            destination=r["to_stop"],
+            departure=r["departure"],
+            arrival=r["arrival"],
+            route=r["route_name"],
+            sequence=r["stop_sequence"],
+            can_board=r["can_board"],
+            can_alight=r["can_alight"],
+        )
+        for r in rows
+    ]
+
+
+def load_commute(query: str) -> dict[str, Any]:
+    day, deadline, budget, walk, lat, lon = _commute_parameters(query)
+    parameters = _database_parameters()
+    with psycopg.connect(**parameters, row_factory=dict_row) as connection:  # type: ignore[arg-type]
+        published = connection.execute("SELECT * FROM marts.published_snapshot").fetchone()
+    if not published:
+        raise ValueError("No timetable is published yet.")
+    stops, connections = _commute_timetable(published["pipeline_run_id"], day, deadline, budget)
+    return {
+        "stops": reachable_stops(stops, connections, (lon, lat), deadline, budget, walk),
+        "date": day,
+        "deadline": deadline,
+        "minutes": budget // 60,
+        "walk": walk // 60,
+        "destination": [lon, lat],
+        "snapshot_date": published["snapshot_date"],
+        "connections": len(connections),
+    }
+
+
 class DashboardHandler(BaseHTTPRequestHandler):
     """Serve the dashboard shell and its read-only JSON data."""
 
@@ -507,6 +611,31 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if request.path == "/api/dashboard":
             payload = json.dumps(load_dashboard_data(), default=_json_default).encode()
             self._send(HTTPStatus.OK, payload, "application/json")
+            return
+        if request.path == "/api/commute":
+            try:
+                commute_payload = load_commute(request.query)
+                self._send(
+                    HTTPStatus.OK,
+                    json.dumps(commute_payload, default=_json_default),
+                    "application/json",
+                )
+            except ValueError as error:
+                self._send(
+                    HTTPStatus.BAD_REQUEST, json.dumps({"error": str(error)}), "application/json"
+                )
+            except psycopg.Error:
+                logger.exception("commute_unavailable")
+                self._send(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    json.dumps(
+                        {
+                            "error": "Commute timetables are unavailable. "
+                            "Please retry after the data update."
+                        }
+                    ),
+                    "application/json",
+                )
             return
         if request.path == "/api/refresh":
             refresh_payload = json.dumps(refresh_status(), default=_json_default)

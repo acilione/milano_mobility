@@ -1,5 +1,28 @@
 # Test report
 
+## Commute map validation — 2026-09-07
+
+- Ruff lint and formatting, strict mypy (12 modules), TypeScript checking and production
+  image build passed.
+- All 74 unit tests passed; total coverage was 82.94%, including 100% of the routing module.
+  Cases cover through-riding, transfer margins and walking transfers, boarding/alighting
+  restrictions, the three-boarding limit, deadlines, negative after-midnight offsets and
+  invalid API parameters.
+- The three commute models and the connection-integrity test passed on the existing full
+  warehouse. The connection table contains 9,326,313 rows across stored snapshots. The
+  revised build took 119 seconds; the complete selected build/test took 338 seconds.
+- A read-only integration test against the published Milan timetable passed. A request
+  for Duomo on 2026-09-07, arriving by 09:00 within 30 minutes with 10-minute walks, scanned
+  16,547 connections and returned 1,175 reachable stops. An observed request took about
+  six seconds while other validation was active; this is not a latency guarantee.
+- Chromium checks exercised actual API results, journey details, 30/45-minute budgets,
+  saved browser preferences, weekend/evening changes, mobile overflow at 390 px and
+  recovery after a simulated HTTP 503. No JavaScript page errors were observed.
+
+These checks validate the implementation against schedules. They do not validate walking
+paths against streets or establish real-world punctuality. Shading uses conservative
+100 m cells within estimated walking catchments.
+
 ## Baseline
 
 - Project version: 1.0.0

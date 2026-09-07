@@ -42,7 +42,7 @@ export interface MobilityMap {
 }
 
 const EMPTY_LINES: FeatureCollection<LineString> = { type: "FeatureCollection", features: [] };
-const MAP_STYLE: StyleSpecification = {
+export const MAP_STYLE: StyleSpecification = {
   version: 8,
   sources: {
     openStreetMap: {
@@ -63,6 +63,8 @@ const MAP_STYLE: StyleSpecification = {
     },
   ],
 };
+
+export { createCommuteMap } from "./commute";
 
 function routeColor(route: Route): string {
   if (/^[0-9a-f]{6}$/i.test(route.route_color ?? "")) return `#${route.route_color}`;

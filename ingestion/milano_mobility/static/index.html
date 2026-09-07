@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#07110f">
-  <title>Mobility Observatory</title>
+  <title>Milan Commute Map</title>
   <link rel="stylesheet" href="/assets/maplibre-gl.css">
   <style>
     :root {
@@ -95,24 +95,50 @@
     @media(max-width:760px){.shell{width:min(100% - 24px,1440px)}header{grid-template-columns:1fr;padding-top:40px}.snapshot{border-left:0;
       border-top:1px solid var(--line);padding:20px 0 0}.kpis{grid-template-columns:1fr 1fr}.panel{padding:18px}.map-layout{grid-template-columns:1fr}
       .map{height:390px}.change-grid{grid-template-columns:1fr}footer{display:block}.brand-copy{display:none}.nav-actions{gap:9px}.status{display:none}}
+    header{padding:32px 0 24px;gap:30px}h1{font-size:clamp(36px,4.3vw,62px);line-height:1.03;margin:12px 0 16px}.lede{font-size:15px}.snapshot strong{font-size:23px}
+    .commute-heading{display:flex;justify-content:space-between;gap:20px;align-items:start;margin-bottom:20px}
+    .commute-heading h2{font-size:32px;letter-spacing:-.04em;margin:5px 0}.commute-heading p{color:var(--muted);margin:0}
+    #commute{margin-bottom:32px}.commute-layout{display:grid;grid-template-columns:300px minmax(0,1fr);border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--panel)}
+    .commute-controls{padding:24px}.commute-controls label{display:block;font-size:12px;font-weight:700;margin:16px 0 7px}.commute-controls label:first-child{margin-top:0}
+    .commute-controls input,.commute-controls select{width:100%;min-width:0;padding:11px 10px;border:1px solid var(--line);border-radius:8px;background:#10251f;color:var(--ink);font:inherit;font-size:13px;color-scheme:dark}
+    .commute-controls :focus-visible,.commute-stop-list button:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+    .commute-fields{display:grid;grid-template-columns:1.3fr 1fr;gap:8px}.field-help{font-size:11px;color:var(--muted);line-height:1.5;margin:8px 0}
+    .destination-card{display:flex;gap:10px;margin:18px 0;padding:12px;border:1px solid rgba(255,122,102,.25);border-radius:9px;background:rgba(255,122,102,.05)}
+    .destination-dot{width:9px;height:9px;background:var(--coral);border-radius:50%;flex:none;margin-top:6px}.destination-card strong{font-size:13px;display:block}.destination-card small{color:var(--muted);font-size:11px}
+    .commute-submit{width:100%;padding:13px 12px;display:flex;justify-content:space-between;background:var(--lime);color:var(--bg);border:0;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;margin-top:20px}
+    .commute-submit:disabled{opacity:.5;cursor:wait}.commute-save{background:none;border:0;color:var(--mint);font-size:12px;padding:12px 0;cursor:pointer}
+    #commute-status{font-size:12px;color:var(--muted);margin:4px 0;min-height:36px}.commute-map-wrap{position:relative;min-height:650px}#commute-map{position:absolute;inset:0;background:#0b1a16}
+    .commute-legend{position:absolute;top:18px;left:18px;right:58px;display:flex;gap:14px;flex-wrap:wrap;pointer-events:none;background:rgba(7,17,15,.9);border:1px solid var(--line);border-radius:9px;padding:10px 14px;width:fit-content}
+    .commute-legend span{font-size:11px;display:flex;align-items:center;gap:6px}.commute-legend [hidden]{display:none}.commute-legend i{width:9px;height:9px;border-radius:50%}
+    .commute-map-note{position:absolute;bottom:36px;left:14px;right:14px;width:fit-content;background:rgba(7,17,15,.9);color:var(--muted);font-size:11px;padding:7px 10px;border-radius:7px;pointer-events:none}
+    .commute-assumptions{font-size:12px;color:var(--muted);padding:16px 0;max-width:1000px}.commute-assumptions strong{color:var(--ink)}
+    .commute-results{display:grid;grid-template-columns:1fr 1fr;gap:24px;border-top:1px solid var(--line);padding-top:20px}.commute-results h3{margin:0 0 8px;font-size:18px}.commute-results p{font-size:13px;color:var(--muted);margin:0 0 16px}
+    .commute-stop-list{max-height:330px;overflow:auto;scrollbar-color:var(--mint) transparent}.commute-stop-list button{display:flex;align-items:center;justify-content:space-between;gap:16px;text-align:left;width:100%;padding:12px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);font-size:13px;cursor:pointer}.commute-stop-list button:hover{background:rgba(72,227,181,.08)}.commute-stop-list strong{white-space:nowrap;color:var(--mint)}
+    #commute-journey{padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}.journey-legs{list-style:none;padding:0 0 0 15px;border-left:2px solid var(--mint)}.journey-legs li{margin-bottom:16px}.journey-legs span{display:block;font-size:11px;color:var(--muted)}.journey-legs strong{font-size:14px}.journey-legs p{margin:3px 0}
+    .network-details{border-top:1px solid var(--line);padding-top:20px}.network-details>summary{cursor:pointer;color:var(--muted);font-size:14px;margin-bottom:20px}
+    @media(max-width:900px){.commute-layout{grid-template-columns:260px minmax(0,1fr)}.commute-controls{padding:18px}}
+    @media(max-width:650px){header{padding:24px 0;gap:18px}.snapshot{padding-top:12px}.snapshot span,.snapshot strong{display:inline;font-size:12px;letter-spacing:0;margin-right:8px}.snapshot small{display:none}.commute-heading{display:block}.commute-heading .tag{display:inline-block;margin-top:12px}.commute-layout,.commute-results{grid-template-columns:1fr}.commute-map-wrap{min-height:440px}.commute-fields{grid-template-columns:1.4fr 1fr;gap:10px}.commute-controls label:first-child{margin-top:12px}.commute-legend{gap:9px;padding:8px}.commute-map-note{font-size:10px}.commute-heading h2{font-size:28px}}
   </style>
 </head>
 <body>
   <div class="shell">
     <nav><div class="brand"><div class="brand-mark"></div><span class="brand-copy" id="brand">Mobility Observatory</span></div>
-      <div class="nav-actions"><div class="status"><i class="pulse" id="pulse"></i><span id="status">Connecting to published marts</span></div>
+      <div class="nav-actions"><div class="status"><i class="pulse" id="pulse"></i><span id="status">Loading timetable</span></div>
         <button class="refresh-button" id="refresh-data" type="button">Update data</button></div></nav>
     <div class="refresh-progress" id="refresh-progress" hidden aria-live="polite"><div class="refresh-copy"><span id="refresh-message"></span>
       <strong id="refresh-percent">0%</strong></div><div class="refresh-track"><i id="refresh-bar"></i></div></div>
-    <header><div><div class="eyebrow" id="eyebrow">Scheduled transport intelligence</div><h1>See the network.<br><em>Read the rhythm.</em></h1>
+    <header><div><div class="eyebrow" id="eyebrow">Commute explorer / Milan</div><h1>A place to live.<br><em>A way to get there.</em></h1>
       <div class="lede" id="lede">A quality-controlled view of scheduled public transport.</div></div>
       <div class="snapshot"><span>Source snapshot</span><strong id="snapshot">Preparing data</strong><small id="generated">The page refreshes automatically</small></div></header>
-    <main id="main"><section class="waiting"><div class="waiting-orbit"></div><h2>Building the first analytical view</h2>
-      <p>The dashboard will populate as soon as dbt publishes the marts.</p></section></main>
+    <section id="commute" aria-label="Commute explorer"><p>Loading the published timetable…</p></section>
+    <details class="network-details"><summary>Explore the transport network and source data</summary><main id="main"><section class="waiting"><div class="waiting-orbit"></div><h2>Building the first analytical view</h2>
+      <p>The dashboard will populate as soon as dbt publishes the marts.</p></section></main></details>
     <footer><span id="attribution"></span><span>Static GTFS measures scheduled supply, not real-time punctuality.</span></footer>
   </div>
   <script type="module">
     import {createMap} from "/assets/map.js";
+    import {createCommuteMap} from "/assets/map.js";
+    let commuteController=null;
     const fmt=n=>new Intl.NumberFormat(undefined).format(Number(n||0));
     const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
     const attr=esc;let currentSnapshot=null,refreshTimer=null,refreshPollTimer=null,mapController=null,lastCompletedRefresh=null;
@@ -136,8 +162,8 @@
       return `<div class="map-layout"><div class="map"><div id="network-map" role="application" aria-label="Interactive MapLibre map of scheduled stops"></div><span class="map-hint">Drag to pan &middot; wheel to zoom &middot; click a cluster or stop</span></div><aside class="stop-detail" id="stop-detail" aria-live="polite"><p class="empty">Select a stop to see its scheduled calls and connected routes.</p></aside></div>`}
     function changes(rows){const grouped={stop:{},route:{},trip:{}};rows.forEach(x=>(grouped[x.entity_type]??={})[x.change_type]=+x.changed_entities);
       return `<div class="change-grid">${Object.entries(grouped).map(([name,v])=>`<div class="change"><span class="entity">${name} changes</span><strong>${fmt(Object.values(v).reduce((a,b)=>a+b,0))}</strong><div class="split"><span class="added">+ ${fmt(v.ADDED||0)} added</span><span class="modified">&bull; ${fmt(v.MODIFIED||0)} modified</span><span class="removed">- ${fmt(v.REMOVED||0)} removed</span></div></div>`).join("")}</div>`}
-    function applyMeta(meta){document.title=meta.title;document.querySelector("#brand").textContent=meta.title;document.querySelector("#eyebrow").textContent=`Scheduled transport intelligence / ${meta.area_name}`;
-      document.querySelector("#lede").textContent=`A quality-controlled view of ${meta.area_name}'s complete scheduled public-transport network.`;
+    function applyMeta(meta){document.title=`${meta.area_name} Commute Map`;document.querySelector("#brand").textContent=`${meta.area_name} Commute Map`;document.querySelector("#eyebrow").textContent=`Commute explorer / ${meta.area_name}`;
+      document.querySelector("#lede").textContent=`Find the areas that fit your daily journey in ${meta.area_name}. Compare travel dates, arrival times and the time you want to spend commuting.`;
       const source=meta.source_url?`<a href="${attr(meta.source_url)}">${esc(meta.source_label)}</a>`:esc(meta.source_label);document.querySelector("#attribution").innerHTML=`Official GTFS &middot; ${source} &middot; ${esc(meta.license)}`}
     function selectStop(stops,index){const stop=stops[index],routeIds=new Set((stop.routes||[]).map(r=>String(r.route_sk)));history.replaceState(null,"",`#stop=${encodeURIComponent(stop.stop_id)}`);
       const list=document.querySelector("#route-list");list?.classList.add("has-selection");document.querySelectorAll(".route").forEach(row=>row.classList.toggle("connected",routeIds.has(row.dataset.route)));
@@ -145,9 +171,10 @@
       list?.scrollTo({top:0,behavior:"smooth"})}
     function initMap(stops){mapController?.destroy();const requestedStop=new URLSearchParams(location.hash.slice(1)).get("stop"),requestedIndex=stops.findIndex(stop=>String(stop.stop_id)===requestedStop);
       mapController=createMap("network-map",stops,index=>selectStop(stops,index),requestedIndex>=0?requestedIndex:null);if(requestedIndex>=0)selectStop(stops,requestedIndex)}
-    function render(d){applyMeta(d.meta);if(d.state!=="ready"){document.querySelector("#main").innerHTML=`<section class="waiting"><div class="waiting-orbit"></div><h2>Dashboard online, marts pending</h2><p>${esc(d.message)}</p></section>`;return}
-      document.querySelector("#pulse").classList.add("ready");document.querySelector("#status").textContent="Published marts online";document.querySelector("#snapshot").textContent=d.summary.snapshot_date||"Available";
+    function render(d){applyMeta(d.meta);if(d.state!=="ready"){document.querySelector("#commute").innerHTML=`<section class="waiting"><h2>Your commute map is waiting for a timetable</h2><p>${esc(d.message)}</p></section>`;commuteController?.destroy();commuteController=null;currentSnapshot=null;document.querySelector("#main").innerHTML=`<section class="waiting"><div class="waiting-orbit"></div><h2>Dashboard online, marts pending</h2><p>${esc(d.message)}</p></section>`;return}
+      document.querySelector("#pulse").classList.add("ready");document.querySelector("#status").textContent="Timetable available";document.querySelector("#snapshot").textContent=d.summary.snapshot_date||"Available";
       document.querySelector("#generated").textContent=`Updated ${new Date(d.generated_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`;if(currentSnapshot===d.summary.snapshot_date)return;currentSnapshot=d.summary.snapshot_date;const s=d.summary;
+      commuteController?.destroy();commuteController=createCommuteMap(document.querySelector("#commute"),d.stops,d.service_days);
       document.querySelector("#main").innerHTML=`<section class="kpis">${metric("Scheduled trips",s.scheduled_trips,"Latest service window")}${metric("Stop events",s.stop_events,"Scheduled calls")}${metric("Active stops",s.active_stops,"Served in this snapshot")}${metric("Active routes",s.active_routes,"Published network")}${metric("Service days",s.service_days,"Current calendar")}</section><section class="dashboard-grid">
         <article class="panel"><div class="panel-head"><div><h2>Departures by service hour</h2><p>GTFS hours remain valid beyond midnight.</p></div><span class="tag">Supply rhythm</span></div>${hourly(d.departures)}</article>
         <article class="panel"><div class="panel-head"><div><h2>Route coverage</h2><p>Distinct scheduled stops by line.</p></div><span class="tag">Network</span></div>${routes(d.route_coverage)}</article>
