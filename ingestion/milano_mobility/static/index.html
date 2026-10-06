@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#07110f">
-  <title>Milan Commute Map</title>
+  <title>Milan Commute Planner</title>
   <link rel="stylesheet" href="/assets/maplibre-gl.css">
   <style>
     :root {
@@ -118,6 +118,42 @@
     .network-details{border-top:1px solid var(--line);padding-top:20px}.network-details>summary{cursor:pointer;color:var(--muted);font-size:14px;margin-bottom:20px}
     @media(max-width:900px){.commute-layout{grid-template-columns:260px minmax(0,1fr)}.commute-controls{padding:18px}}
     @media(max-width:650px){header{padding:24px 0;gap:18px}.snapshot{padding-top:12px}.snapshot span,.snapshot strong{display:inline;font-size:12px;letter-spacing:0;margin-right:8px}.snapshot small{display:none}.commute-heading{display:block}.commute-heading .tag{display:inline-block;margin-top:12px}.commute-layout,.commute-results{grid-template-columns:1fr}.commute-map-wrap{min-height:440px}.commute-fields{grid-template-columns:1.4fr 1fr;gap:10px}.commute-controls label:first-child{margin-top:12px}.commute-legend{gap:9px;padding:8px}.commute-map-note{font-size:10px}.commute-heading h2{font-size:28px}}
+    header h1{font-size:clamp(30px,3.1vw,44px);letter-spacing:-.035em}header{padding:28px 0}.comparison-title h2{font-size:23px;margin:0 0 6px}.comparison-title p{color:var(--muted);margin:0 0 24px}
+    #comparison [hidden]{display:none}#comparison{margin-bottom:32px}.comparison-layout{display:grid;grid-template-columns:minmax(340px,420px) minmax(0,1fr);gap:24px;align-items:start}.comparison-form{padding:22px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+    .comparison-form fieldset{border:0;border-bottom:1px solid var(--line);padding:0 0 20px;margin:0 0 20px;min-width:0}.comparison-form legend{font-size:16px;font-weight:750;margin-bottom:14px}.comparison-form label{font-size:12px;display:block;color:var(--muted);margin-bottom:6px}.comparison-form input:not([type=checkbox]),.comparison-form select,.comparison-map-toolbar select{display:block;width:100%;min-width:0;background:#10251f;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:10px;font:inherit;font-size:13px;color-scheme:dark;margin-top:6px}
+    .comparison-form :focus-visible,.comparison-results-header button:focus-visible{outline:2px solid var(--mint);outline-offset:2px}.comparison-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.office-days{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.office-days label{display:flex;align-items:center;gap:4px;color:var(--ink)}.office-days input{accent-color:var(--mint)}
+    .address-search{display:flex;align-items:center;gap:6px}.address-search input{flex:1}.secondary-button{border:1px solid var(--line);border-radius:6px;padding:9px 11px;background:#10251f;color:var(--ink);font-size:12px;cursor:pointer;white-space:nowrap}.secondary-button:hover{border-color:var(--mint)}.secondary-button:disabled{opacity:.5;cursor:default}.selected-location{font-size:11px;color:var(--muted);margin:7px 0}.address-results{font-size:12px;color:var(--muted)}.address-results button{display:block;width:100%;background:#142c25;color:var(--ink);border:1px solid var(--line);padding:9px;text-align:left;font:inherit;cursor:pointer}.address-results button:hover{border-color:var(--mint)}
+    .location-editor{padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid var(--line)}#destination-fields .location-editor{padding:0;margin:0;border:0}.apartment-options{display:flex;align-items:end;gap:12px}.apartment-options label{flex:1;margin:0}.map-location-button{border:0;background:none;padding:6px 0;color:var(--mint);font-size:12px;cursor:pointer}.comparison-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}#comparison-status{font-size:13px;color:var(--muted);margin:14px 0 0}
+    .address-results{max-height:220px;overflow-y:auto;border-radius:6px;margin-top:6px}.address-results button{min-height:44px;overflow-wrap:anywhere}.address-results button[aria-selected=true]{background:#234b3d;border-color:var(--mint);outline:1px solid var(--mint);outline-offset:-2px}.address-feedback{font-size:11px;color:var(--muted);margin:7px 0;line-height:1.5}.address-feedback:empty{display:none}
+    .comparison-map-column{position:sticky;top:16px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}.comparison-map-toolbar{padding:16px;display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;font-size:12px}.comparison-map-toolbar select{margin:0}.comparison-map-toolbar p{grid-column:1/-1;margin:0;color:var(--muted)}#comparison-map{height:490px}.comparison-notes{padding:16px;font-size:12px;color:var(--muted)}.comparison-notes p{margin:0 0 10px}.comparison-notes a{color:var(--mint)}#comparison-coverage{color:var(--ink)}.comparison-pin{width:28px;height:28px;display:grid;place-items:center;background:var(--mint);color:#07110f;border:2px solid white;border-radius:50%;font-size:13px;font-weight:800;box-shadow:0 2px 8px #0008}.destination-pin{background:var(--coral)}
+    #comparison-results{margin-top:28px}.comparison-empty{padding:20px;border:1px solid var(--line);border-radius:8px;color:var(--muted)}.comparison-results-header{display:flex;justify-content:space-between;align-items:center;gap:16px}.comparison-results-header h2{font-size:22px;margin:0}.comparison-results-header p{font-size:13px;color:var(--muted)}.comparison-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}.comparison-table{width:100%;border-collapse:collapse;font-size:13px}.comparison-table caption{text-align:left;padding:12px;color:var(--muted)}.comparison-table th,.comparison-table td{padding:14px;text-align:left;border-top:1px solid var(--line);vertical-align:top;min-width:160px}.comparison-table thead th{background:var(--panel)}.comparison-table th small{display:block;color:var(--muted);font-weight:400;margin-top:6px}.comparison-table tbody th{font-weight:500;color:var(--muted)}.comparison-table tbody tr:last-child{background:#18342a}.comparison-method{font-size:12px;color:var(--muted)}.apartment-journeys{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px}.apartment-journeys article{padding:18px;border:1px solid var(--line);border-radius:10px}.apartment-journeys h3{font-size:16px;margin:0 0 14px}.apartment-journeys h4{font-size:14px;margin:18px 0 6px}.apartment-journeys summary{cursor:pointer;font-size:13px;padding:10px 0}.apartment-journeys p{font-size:12px;color:var(--muted)}.apartment-journeys details{border-top:1px solid var(--line)}
+    @media(max-width:850px){.comparison-layout{grid-template-columns:1fr}.comparison-map-column{position:static}#comparison-map{height:380px}.comparison-form{padding:18px}.comparison-results-header{align-items:start;flex-direction:column}.comparison-fields{gap:8px}.comparison-table th,.comparison-table td{min-width:140px}}
+    [hidden]{display:none!important}
+    .area-instructions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;padding:18px 18px 18px 36px;margin:0 0 24px;border:1px solid var(--line);border-radius:12px;font-size:13px;color:var(--muted)}.area-instructions strong{color:var(--ink)}
+    .tool-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 32px}
+    .tool-picker button{display:flex;flex-direction:column;gap:9px;padding:20px;text-align:left;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);cursor:pointer}
+    .tool-picker button[aria-pressed=true]{border-color:var(--mint);background:#143027;box-shadow:inset 0 3px 0 var(--mint)}
+    .tool-picker button:hover{border-color:var(--mint)}.tool-picker strong{font-size:16px}.tool-picker span{font-size:13px;color:var(--muted);line-height:1.5}.tool-picker small{margin-top:auto;font-size:11px;color:var(--mint)}
+    .tool-picker button:focus-visible,summary:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+    .comparison-layout{grid-template-columns:minmax(370px,1fr) minmax(0,1.15fr);gap:24px}
+    .comparison-form{padding:24px}.comparison-steps{display:flex;gap:6px;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px}
+    .comparison-steps button{display:flex;align-items:center;gap:7px;flex:1;padding:8px 3px;background:none;border:0;color:var(--muted);font-size:12px;cursor:pointer;text-align:left}
+    .comparison-steps button span{display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;width:25px;height:25px;flex-shrink:0}
+    .comparison-steps button[aria-current]{color:var(--ink);font-weight:700}.comparison-steps button[aria-current] span{background:var(--mint);color:var(--bg);border-color:var(--mint)}
+    .comparison-form legend{font-size:19px;line-height:1.4;margin-bottom:8px}.comparison-form fieldset{padding-bottom:0;border:0;margin-bottom:20px}
+    .step-help{font-size:13px;line-height:1.6;color:var(--muted);margin:0 0 20px}.field-label{font-size:13px;margin:20px 0 8px}.comparison-form input:not([type=checkbox]),.comparison-form select{font-size:14px;min-height:44px}
+    .step-actions{display:flex;gap:10px;align-items:stretch}.step-actions .commute-submit{margin:0;justify-content:center;flex:1}.step-actions .secondary-button{min-width:75px}
+    #comparison-status:empty{display:none}#comparison-status{margin:0 0 18px;padding:12px;border-left:3px solid var(--mint);background:#143027;color:var(--ink);font-size:13px}
+    .selection-summary{padding:12px;margin-bottom:18px;border:1px solid var(--line);border-radius:8px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+    .save-options{margin-top:22px;border-top:1px solid var(--line);padding-top:16px;font-size:13px}.save-options summary,.comparison-notes summary,.comparison-method summary{cursor:pointer;color:var(--ink)}.save-options p{font-size:12px;color:var(--muted)}
+    .map-placement-actions{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}.comparison-map-column{position:sticky;top:16px}#comparison-map{height:360px}.comparison-notes details p{margin-top:12px}.comparison-map-toolbar{grid-template-columns:70px 1fr}
+    .comparison-empty{padding:24px;border:1px dashed var(--line);border-radius:12px;margin-top:24px;color:var(--muted)}.comparison-empty h3{margin:0 0 8px;color:var(--ink);font-size:16px}.comparison-empty p{margin:0;max-width:760px;font-size:13px}
+    #comparison-results{scroll-margin-top:24px}.results-guide{font-size:13px;color:var(--muted);max-width:880px}.comparison-method{margin:16px 0 24px}.comparison-method p{margin-top:10px}.comparison-title p{max-width:850px}
+    .office-days label{border:1px solid var(--line);padding:8px;border-radius:6px;min-height:42px}.office-days label:has(input:checked){border-color:var(--mint);background:#143027}.office-days{gap:6px}
+    @media(max-width:950px){.comparison-layout{grid-template-columns:1fr 1fr}.comparison-form{padding:18px}.tool-picker button{padding:16px}.comparison-steps button{gap:4px;font-size:11px}}
+    @media(max-width:760px){.tool-picker{grid-template-columns:1fr;gap:8px;margin-bottom:24px}.tool-picker button{gap:4px;padding:14px 16px}.tool-picker small{display:none}.comparison-layout{grid-template-columns:1fr}.comparison-map-column{position:static}.comparison-steps button{font-size:12px}#comparison-map{height:300px}.comparison-fields{gap:10px}.comparison-form input:not([type=checkbox]),.comparison-form select{font-size:16px}.comparison-title h2{font-size:22px}}
+    @media(max-width:760px){.area-instructions{grid-template-columns:1fr;gap:12px}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation:none!important;transition:none!important}}
   </style>
 </head>
 <body>
@@ -127,18 +163,30 @@
         <button class="refresh-button" id="refresh-data" type="button">Update data</button></div></nav>
     <div class="refresh-progress" id="refresh-progress" hidden aria-live="polite"><div class="refresh-copy"><span id="refresh-message"></span>
       <strong id="refresh-percent">0%</strong></div><div class="refresh-track"><i id="refresh-bar"></i></div></div>
-    <header><div><div class="eyebrow" id="eyebrow">Commute explorer / Milan</div><h1>A place to live.<br><em>A way to get there.</em></h1>
+    <header><div><div class="eyebrow" id="eyebrow">Milan mobility</div><h1>Milan commute planner</h1>
       <div class="lede" id="lede">A quality-controlled view of scheduled public transport.</div></div>
-      <div class="snapshot"><span>Source snapshot</span><strong id="snapshot">Preparing data</strong><small id="generated">The page refreshes automatically</small></div></header>
-    <section id="commute" aria-label="Commute explorer"><p>Loading the published timetable…</p></section>
-    <details class="network-details"><summary>Explore the transport network and source data</summary><main id="main"><section class="waiting"><div class="waiting-orbit"></div><h2>Building the first analytical view</h2>
-      <p>The dashboard will populate as soon as dbt publishes the marts.</p></section></main></details>
+      <div class="snapshot"><span>Timetable published</span><strong id="snapshot">Preparing data</strong><small id="generated">The page refreshes automatically</small></div></header>
+    <section class="tool-picker" aria-label="Choose a planning tool">
+      <button type="button" data-tool="comparison" aria-pressed="true" aria-controls="comparison"><strong>Compare apartments</strong><span>Compare addresses you are considering by rent, daily journeys and weekly travel time.</span><small>Enter destination → add apartments → choose travel days</small></button>
+      <button type="button" data-tool="area-panel" aria-pressed="false" aria-controls="area-panel"><strong>Explore commute areas</strong><span>Find areas within 15–60 minutes of your destination before choosing an apartment.</span><small>Set destination → choose a time limit → inspect the map</small></button>
+      <button type="button" data-tool="network-panel" aria-pressed="false" aria-controls="network-panel"><strong>Explore the transport network</strong><span>Inspect stops, routes and the published service calendar.</span><small>Select a stop → view its lines and scheduled service</small></button>
+    </section>
+    <section id="comparison" aria-label="Apartment comparison"><p>Loading timetable coverage…</p></section>
+    <section id="area-panel" hidden aria-label="Explore commute areas"><section id="commute" aria-label="Commute area map"><p>Loading the published timetable…</p></section></section>
+    <section id="network-panel" hidden aria-label="Explore the transport network"><div class="comparison-title"><h2>Explore the transport network</h2><p>Review scheduled services and the calendar below. On the stop map, select a stop to see which routes serve it. These figures describe the timetable, not live vehicle locations.</p></div><main id="main"><section class="waiting"><h2>Loading transport data</h2><p>Published services will appear here when the timetable is available.</p></section></main></section>
     <footer><span id="attribution"></span><span>Static GTFS measures scheduled supply, not real-time punctuality.</span></footer>
   </div>
   <script type="module">
     import {createMap} from "/assets/map.js";
     import {createCommuteMap} from "/assets/map.js";
-    let commuteController=null;
+    import {createComparison} from "/assets/map.js";
+    let commuteController=null,comparisonController=null;
+    document.querySelectorAll('[data-tool]').forEach(button=>button.addEventListener('click',()=>{
+      document.querySelectorAll('[data-tool]').forEach(other=>{
+        const selected=other===button;other.setAttribute('aria-pressed',String(selected));
+        document.getElementById(other.dataset.tool).hidden=!selected;
+      });
+    }));
     const fmt=n=>new Intl.NumberFormat(undefined).format(Number(n||0));
     const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
     const attr=esc;let currentSnapshot=null,refreshTimer=null,refreshPollTimer=null,mapController=null,lastCompletedRefresh=null;
@@ -162,8 +210,8 @@
       return `<div class="map-layout"><div class="map"><div id="network-map" role="application" aria-label="Interactive MapLibre map of scheduled stops"></div><span class="map-hint">Drag to pan &middot; wheel to zoom &middot; click a cluster or stop</span></div><aside class="stop-detail" id="stop-detail" aria-live="polite"><p class="empty">Select a stop to see its scheduled calls and connected routes.</p></aside></div>`}
     function changes(rows){const grouped={stop:{},route:{},trip:{}};rows.forEach(x=>(grouped[x.entity_type]??={})[x.change_type]=+x.changed_entities);
       return `<div class="change-grid">${Object.entries(grouped).map(([name,v])=>`<div class="change"><span class="entity">${name} changes</span><strong>${fmt(Object.values(v).reduce((a,b)=>a+b,0))}</strong><div class="split"><span class="added">+ ${fmt(v.ADDED||0)} added</span><span class="modified">&bull; ${fmt(v.MODIFIED||0)} modified</span><span class="removed">- ${fmt(v.REMOVED||0)} removed</span></div></div>`).join("")}</div>`}
-    function applyMeta(meta){document.title=`${meta.area_name} Commute Map`;document.querySelector("#brand").textContent=`${meta.area_name} Commute Map`;document.querySelector("#eyebrow").textContent=`Commute explorer / ${meta.area_name}`;
-      document.querySelector("#lede").textContent=`Find the areas that fit your daily journey in ${meta.area_name}. Compare travel dates, arrival times and the time you want to spend commuting.`;
+    function applyMeta(meta){document.title=`${meta.area_name} Commute Planner`;document.querySelector("#brand").textContent=`${meta.area_name} Mobility`;document.querySelector("#eyebrow").textContent=`Scheduled public transport / ${meta.area_name}`;
+      document.querySelector("#lede").textContent=`Plan scheduled travel to work or study in Milan. Choose a tool below to compare apartments, explore commute areas or inspect the transport network.`;
       const source=meta.source_url?`<a href="${attr(meta.source_url)}">${esc(meta.source_label)}</a>`:esc(meta.source_label);document.querySelector("#attribution").innerHTML=`Official GTFS &middot; ${source} &middot; ${esc(meta.license)}`}
     function selectStop(stops,index){const stop=stops[index],routeIds=new Set((stop.routes||[]).map(r=>String(r.route_sk)));history.replaceState(null,"",`#stop=${encodeURIComponent(stop.stop_id)}`);
       const list=document.querySelector("#route-list");list?.classList.add("has-selection");document.querySelectorAll(".route").forEach(row=>row.classList.toggle("connected",routeIds.has(row.dataset.route)));
@@ -171,12 +219,13 @@
       list?.scrollTo({top:0,behavior:"smooth"})}
     function initMap(stops){mapController?.destroy();const requestedStop=new URLSearchParams(location.hash.slice(1)).get("stop"),requestedIndex=stops.findIndex(stop=>String(stop.stop_id)===requestedStop);
       mapController=createMap("network-map",stops,index=>selectStop(stops,index),requestedIndex>=0?requestedIndex:null);if(requestedIndex>=0)selectStop(stops,requestedIndex)}
-    function render(d){applyMeta(d.meta);if(d.state!=="ready"){document.querySelector("#commute").innerHTML=`<section class="waiting"><h2>Your commute map is waiting for a timetable</h2><p>${esc(d.message)}</p></section>`;commuteController?.destroy();commuteController=null;currentSnapshot=null;document.querySelector("#main").innerHTML=`<section class="waiting"><div class="waiting-orbit"></div><h2>Dashboard online, marts pending</h2><p>${esc(d.message)}</p></section>`;return}
+    function render(d){applyMeta(d.meta);if(d.state!=="ready"){comparisonController?.updateCoverage([]);document.querySelector("#commute").innerHTML=`<section class="waiting"><h2>Timetable unavailable</h2><p>${esc(d.message)}</p></section>`;commuteController?.destroy();commuteController=null;currentSnapshot=null;document.querySelector("#main").innerHTML=`<section class="waiting"><div class="waiting-orbit"></div><h2>Transport data unavailable</h2><p>${esc(d.message)}</p></section>`;return}
       document.querySelector("#pulse").classList.add("ready");document.querySelector("#status").textContent="Timetable available";document.querySelector("#snapshot").textContent=d.summary.snapshot_date||"Available";
       document.querySelector("#generated").textContent=`Updated ${new Date(d.generated_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}`;if(currentSnapshot===d.summary.snapshot_date)return;currentSnapshot=d.summary.snapshot_date;const s=d.summary;
+      if(!comparisonController)comparisonController=createComparison(document.querySelector("#comparison"),d.service_days);else comparisonController.updateCoverage(d.service_days);
       commuteController?.destroy();commuteController=createCommuteMap(document.querySelector("#commute"),d.stops,d.service_days);
       document.querySelector("#main").innerHTML=`<section class="kpis">${metric("Scheduled trips",s.scheduled_trips,"Latest service window")}${metric("Stop events",s.stop_events,"Scheduled calls")}${metric("Active stops",s.active_stops,"Served in this snapshot")}${metric("Active routes",s.active_routes,"Published network")}${metric("Service days",s.service_days,"Current calendar")}</section><section class="dashboard-grid">
-        <article class="panel"><div class="panel-head"><div><h2>Departures by service hour</h2><p>GTFS hours remain valid beyond midnight.</p></div><span class="tag">Supply rhythm</span></div>${hourly(d.departures)}</article>
+        <article class="panel"><div class="panel-head"><div><h2>Departures by service hour</h2><p>GTFS hours remain valid beyond midnight.</p></div><span class="tag">Service hours</span></div>${hourly(d.departures)}</article>
         <article class="panel"><div class="panel-head"><div><h2>Route coverage</h2><p>Distinct scheduled stops by line.</p></div><span class="tag">Network</span></div>${routes(d.route_coverage)}</article>
         <article class="panel wide"><div class="panel-head"><div><h2>Scheduled service calendar</h2><p>Daily trip volume across the published window.</p></div><span class="tag">${fmt(d.service_days.length)} days</span></div>${trend(d.service_days)}</article>
         <article class="panel wide"><div class="panel-head"><div><h2>Interactive stop map</h2><p>Pan, zoom, and select any stop to inspect its routes.</p></div><span class="tag">${fmt(d.stops.length)} stops</span></div>${mapMarkup(d.stops)}</article>

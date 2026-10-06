@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 from collections.abc import Iterable
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +17,58 @@ from botocore.exceptions import ClientError
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from milano_mobility.config import Settings
+
+
+class LocalObjectStore:
+    """Optional filesystem archive with atomic writes and immutable source files."""
+
+    def __init__(self, directory: str) -> None:
+        self.root = Path(directory).expanduser().resolve()
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def _path(self, bucket: str, key: str = "") -> Path:
+        path = (self.root / bucket / key).resolve()
+        if not path.is_relative_to(self.root) or path == self.root:
+            raise ValueError("Archive paths must remain inside the configured directory.")
+        return path
+
+    def ensure_buckets(self, buckets: Iterable[str]) -> None:
+        for bucket in buckets:
+            self._path(bucket).mkdir(parents=True, exist_ok=True)
+
+    def exists(self, bucket: str, key: str) -> bool:
+        return self._path(bucket, key).is_file()
+
+    def put_file(self, bucket: str, key: str, path: Path, metadata: dict[str, str]) -> str:
+        target = self._path(bucket, key)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as temporary:
+                temporary_path = Path(temporary.name)
+            try:
+                shutil.copyfile(path, temporary_path)
+                with suppress(FileExistsError):
+                    os.link(temporary_path, target)
+            finally:
+                temporary_path.unlink(missing_ok=True)
+        return target.as_uri()
+
+    def put_json(self, bucket: str, key: str, payload: dict[str, Any]) -> str:
+        target = self._path(bucket, key)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=target.parent, delete=False
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            json.dump(payload, temporary, sort_keys=True, ensure_ascii=False, indent=2)
+        try:
+            os.replace(temporary_path, target)
+        finally:
+            temporary_path.unlink(missing_ok=True)
+        return target.as_uri()
+
+    def copy(self, source_bucket: str, source_key: str, target_bucket: str, target_key: str) -> str:
+        return self.put_file(target_bucket, target_key, self._path(source_bucket, source_key), {})
 
 
 class ObjectStore:

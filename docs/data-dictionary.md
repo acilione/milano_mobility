@@ -85,6 +85,33 @@ Commute results contain a latest departure and ordered walking/transit legs per 
 Leg times are seconds relative to midnight on the selected date; negative times belong
 to the previous calendar day. Walking areas are estimates, not verified pedestrian routes.
 
+### Apartment comparison API
+
+`GET /api/places?q=...` returns up to five distinct Milan address candidates, using
+a local bounding box and filtering the provider's municipality to Milan/Milano.
+Address fields request suggestions after three characters and a 600 ms typing pause.
+`POST /api/comparison`
+accepts JSON with `destination: {name, point: [lon, lat]}`, `apartments` (one to three
+objects with `name`, `point` and optional numeric monthly `rent`), `week` (ISO date,
+normalized to Monday), `days` (0 = Monday through 6 = Sunday), `arrival`, `departure`
+(HH:MM in Europe/Rome), and `walk` (5, 10 or 15 minutes per leg). The request requires
+`X-Mobility-Action: compare` and has a 16 KB size limit.
+
+Each apartment contains per-date `outbound`, `return` and `return_later` journeys,
+including `departure`, `arrival`, `seconds`, `walking_seconds`, `transfers` and ordered
+`legs`. Times are seconds relative to midnight on that date. Journey duration includes
+connection waits; return duration also includes waiting after the requested departure.
+Unused arrival margin at the destination is excluded. `return_later` starts its search
+ten minutes after the chosen return departure. `weekly_seconds` sums the selected
+round trips only when every one is available; otherwise it is null. Uncovered dates
+have `status: unavailable` and a reason. Covered dates may still have null journeys
+when no route is found under the routing limits.
+
+Street access/egress considers twelve nearby boarding stops per location. Transfers
+retain estimated walks and a two-minute allowance, with at most three transit boardings.
+The search is bounded to ninety minutes per direction. The API returns the source
+snapshot date and service coverage; neither implies live vehicle observations.
+
 ## Universal audit fields
 
 Analytical gold tables expose:

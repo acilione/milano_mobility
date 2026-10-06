@@ -21,7 +21,7 @@ from milano_mobility.config import Settings
 from milano_mobility.database import Database
 from milano_mobility.gtfs import file_sha256
 from milano_mobility.models import Manifest, ManifestStatus, PipelineResult
-from milano_mobility.storage import ObjectStore
+from milano_mobility.storage import LocalObjectStore, ObjectStore
 from milano_mobility.validation import validate_feed
 
 logger = structlog.get_logger()
@@ -161,7 +161,11 @@ def run_pipeline(
         except requests.RequestException as error:
             logger.warning("source_metadata_unavailable", reason=str(error))
 
-    object_store = ObjectStore(runtime)
+    object_store = (
+        LocalObjectStore(runtime.local_archive_directory)
+        if runtime.local_archive_directory
+        else ObjectStore(runtime)
+    )
     object_store.ensure_buckets(
         (runtime.raw_bucket, runtime.quarantine_bucket, runtime.curated_bucket)
     )
@@ -226,7 +230,7 @@ def run_pipeline(
             runtime.invalid_coordinate_threshold,
         )
         report_key = f"quality/snapshot_date={snapshot_date.isoformat()}/{run_id}.json"
-        object_store.put_json(runtime.curated_bucket, report_key, report.to_dict())
+        report_uri = object_store.put_json(runtime.curated_bucket, report_key, report.to_dict())
         if report.blocking:
             quarantine_key = f"{prefix}/feed.zip"
             object_store.copy(
@@ -248,8 +252,7 @@ def run_pipeline(
                 sha256=digest,
             )
             raise ValidationGateError(
-                f"Snapshot {snapshot_date} failed validation; report: "
-                f"s3://{runtime.curated_bucket}/{report_key}"
+                f"Snapshot {snapshot_date} failed validation; report: {report_uri}"
             )
 
         notify("loading", 55, "Loading the validated snapshot into PostgreSQL")
@@ -260,12 +263,12 @@ def run_pipeline(
             notify("modeling", 80, "Building and testing the analytical models")
             try:
                 _run_dbt()
-            except subprocess.CalledProcessError as error:
+            except (subprocess.CalledProcessError, OSError) as error:
                 database.update_status(
                     run_id,
                     ManifestStatus.FAILED,
                     report.status,
-                    f"dbt build failed with exit code {error.returncode}",
+                    f"dbt build failed: {error}",
                 )
                 raise
             database.update_status(run_id, ManifestStatus.PUBLISHED, report.status)

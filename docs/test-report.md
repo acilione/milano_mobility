@@ -1,5 +1,58 @@
 # Test report
 
+## Guided planning workflow — 2026-10-06
+
+- TypeScript checking and the production frontend build passed.
+- Chromium completed the destination → apartments → travel days flow against the
+  published timetable, including autocomplete, field validation and focus, preserved
+  settings across all three tools, explicit map-placement mode, result navigation,
+  daily journey expansion, browser saving and CSV download.
+- A missing apartment after editing returns the user to the correct field. Clicking
+  the map outside placement mode leaves selected addresses unchanged.
+- Desktop (1440 px) and mobile (390 px) checks found no page errors or horizontal
+  document overflow. The interface now explains tool purpose, setup steps and result
+  interpretation without changing the scheduled routing calculation.
+
+## Milan address autocomplete — 2026-10-06
+
+- All 118 unit tests passed (84.04% measured coverage), including municipality filtering,
+  duplicate removal and the five-suggestion limit. Ruff, mypy, TypeScript checking and
+  the frontend production build passed.
+- Chromium verified live partial-street lookup (`Via Pad`), the three-character minimum,
+  600 ms debounce, arrow/Enter selection, mouse selection, focus restoration, Escape/Tab
+  dismissal, stale response cancellation, text composition, empty/error/retry states,
+  added/removed apartment fields and a 390 px mobile layout without horizontal overflow.
+- Address suggestions use Photon with a Milan bounding box and municipality filtering.
+  Street results can represent a street segment; include a house number for a more
+  precise apartment location. Provider requests remain cached and rate limited.
+
+## Apartment comparison validation — 2026-10-06
+
+- Ruff lint/formatting, strict mypy (14 modules), TypeScript checking and the frontend
+  production build passed. All 117 unit tests passed with 83.94% measured coverage;
+  comparison routing reached 98% and the underlying commute scan remained at 100%.
+- Comparison cases cover outbound/return direction, separate later departures, walking
+  limits, missing pedestrian routes, incomplete weeks, input validation, provider failures,
+  address caching and immutable local archives.
+- Downloaded and validated the full official Milan feed: 4,897 stops, 166 routes,
+  175,790 trips and 4,116,522 stop times. All 63 dbt build/test nodes passed in a fresh
+  PostgreSQL 17 database. The published service window was September 14–October 19.
+- The live read-only commute integration check passed against that publication. In a
+  separate fixture database, filesystem-backed ingestion, publication, duplicate skipping
+  and invalid-feed quarantine passed both pipeline integration tests.
+- Chromium exercised two apartments, actual morning/return journeys, daily details,
+  CSV downloads, stale-result invalidation, unavailable dates, live Photon address search,
+  local saving, shared-link restoration and recovery after a simulated HTTP 503.
+  Desktop and 390 px mobile layouts had no page errors or horizontal document overflow.
+- The original MinIO image could not be downloaded in this environment. This run used
+  the optional persistent filesystem archive; a new full Docker image and the S3-backed
+  integration path were not verified. The live-timetable integration test is now opt-in
+  so a fresh fixture-only CI database does not require a preloaded Milan publication.
+
+These checks verify scheduled calculations and provider integration, not observed travel
+times or pedestrian accessibility. Transfer walks remain estimates. Automatic updates
+are configured at a 24-hour interval; the full elapsed interval was not exercised.
+
 ## Commute map validation — 2026-09-07
 
 - Ruff lint and formatting, strict mypy (12 modules), TypeScript checking and production

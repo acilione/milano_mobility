@@ -29,6 +29,10 @@ x-runtime-environment: &runtime-environment
   WEATHER_API_URL: ${WEATHER_API_URL:-https://archive-api.open-meteo.com/v1/archive}
   DASHBOARD_TITLE: ${DASHBOARD_TITLE:-Milano Mobility Observatory}
   DASHBOARD_REFRESH_SECONDS: ${DASHBOARD_REFRESH_SECONDS:-30}
+  DASHBOARD_AUTO_UPDATE_HOURS: ${DASHBOARD_AUTO_UPDATE_HOURS:-24}
+  GEOCODER_URL: ${GEOCODER_URL:-https://photon.komoot.io/api/}
+  WALK_ROUTER_URL: ${WALK_ROUTER_URL:-https://routing.openstreetmap.de/routed-foot}
+  LOCAL_ARCHIVE_DIRECTORY: ${LOCAL_ARCHIVE_DIRECTORY:-}
   DBT_PROJECT_DIR: /workspace/transformations/dbt
   DBT_PROFILES_DIR: /workspace/transformations/dbt
   DBT_THREADS: ${DBT_THREADS:-1}

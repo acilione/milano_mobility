@@ -31,6 +31,9 @@ class Settings:
     s3_access_key: str = field(default_factory=lambda: _env("S3_ACCESS_KEY", "minio"))
     s3_secret_key: str = field(default_factory=lambda: _env("S3_SECRET_KEY", "minio_dev_password"))
     s3_region: str = field(default_factory=lambda: _env("S3_REGION", "eu-south-1"))
+    local_archive_directory: str = field(
+        default_factory=lambda: _env("LOCAL_ARCHIVE_DIRECTORY", "")
+    )
     raw_bucket: str = field(default_factory=lambda: _env("S3_RAW_BUCKET", "raw"))
     quarantine_bucket: str = field(
         default_factory=lambda: _env("S3_QUARANTINE_BUCKET", "quarantine")

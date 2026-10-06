@@ -65,6 +65,7 @@ export const MAP_STYLE: StyleSpecification = {
 };
 
 export { createCommuteMap } from "./commute";
+export { createComparison } from "./comparison";
 
 function routeColor(route: Route): string {
   if (/^[0-9a-f]{6}$/i.test(route.route_color ?? "")) return `#${route.route_color}`;

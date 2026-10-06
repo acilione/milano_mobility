@@ -8,7 +8,7 @@ import os
 import re
 import uuid
 from collections.abc import Callable
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from functools import lru_cache
 from http import HTTPStatus
@@ -20,12 +20,15 @@ from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
 import psycopg
+import requests
 import structlog
 from psycopg.rows import dict_row
 
 from milano_mobility.commute import Connection, reachable_stops
+from milano_mobility.comparison import access_walks, compare_day, validate_comparison
 from milano_mobility.config import Settings
 from milano_mobility.models import ManifestStatus, PipelineResult
+from milano_mobility.places import search_places
 
 logger = structlog.get_logger()
 STATIC_ROOT = files("milano_mobility").joinpath("static")
@@ -550,7 +553,8 @@ def _commute_timetable(
                 c.arrival_seconds + (s.service_date - %(day)s::date) * 86400 AS arrival
             FROM marts.commute_service s
             JOIN marts.commute_connections c USING (pipeline_run_id, service_id)
-            WHERE s.pipeline_run_id = %(run)s AND s.service_date <= %(day)s::date
+            WHERE s.pipeline_run_id = %(run)s
+              AND s.service_date <= %(day)s::date + (%(end)s / 86400)::integer
               AND c.departure_seconds >= %(start)s - (s.service_date - %(day)s::date) * 86400
               AND c.departure_seconds <= %(end)s - (s.service_date - %(day)s::date) * 86400
               AND c.arrival_seconds <= %(end)s - (s.service_date - %(day)s::date) * 86400
@@ -593,6 +597,79 @@ def load_commute(query: str) -> dict[str, Any]:
     }
 
 
+def load_comparison(payload: object) -> dict[str, Any]:
+    settings = validate_comparison(payload)
+    parameters = _database_parameters()
+    with psycopg.connect(**parameters, row_factory=dict_row) as connection:  # type: ignore[arg-type]
+        published = connection.execute("SELECT * FROM marts.published_snapshot").fetchone()
+        if not published:
+            raise ValueError("No timetable has been published.")
+        coverage = connection.execute(
+            "SELECT min(service_date) AS first, max(service_date) AS last "
+            "FROM marts.commute_service WHERE pipeline_run_id = %s",
+            (published["pipeline_run_id"],),
+        ).fetchone()
+        if not coverage or not coverage["first"]:
+            raise ValueError("No service dates are available.")
+    results = [dict(a, days=[]) for a in settings["apartments"]]
+    walks = None
+    for day in settings["dates"]:
+        if not coverage["first"] <= day <= coverage["last"]:
+            rows = [
+                {
+                    "date": day,
+                    "status": "unavailable",
+                    "reason": "Date outside the published timetable.",
+                }
+                for _ in results
+            ]
+        elif day + timedelta(seconds=settings["departure"] + 600 + 5400) > coverage["last"]:
+            rows = [
+                {
+                    "date": day,
+                    "status": "unavailable",
+                    "reason": "The return travel window extends beyond the published timetable.",
+                }
+                for _ in results
+            ]
+        else:
+            stops, morning = _commute_timetable(
+                published["pipeline_run_id"], day, settings["arrival"], 5400
+            )
+            _, evening = _commute_timetable(
+                published["pipeline_run_id"], day, settings["departure"] + 600 + 5400, 600 + 5400
+            )
+            if walks is None:
+                walks = access_walks(
+                    stops,
+                    [settings["destination"], *[a["point"] for a in settings["apartments"]]],
+                    settings["walk"],
+                )
+            rows = [
+                dict(row, date=day, status="ready")
+                for row in compare_day(stops, morning, evening, settings, *walks)
+            ]
+        for apartment, row in zip(results, rows, strict=True):
+            apartment["days"].append(row)
+    for apartment in results:
+        complete = all(
+            d["status"] == "ready" and d["outbound"] and d["return"] for d in apartment["days"]
+        )
+        apartment["weekly_seconds"] = (
+            sum(d["outbound"]["seconds"] + d["return"]["seconds"] for d in apartment["days"])
+            if complete
+            else None
+        )
+    return {
+        "apartments": results,
+        "coverage": coverage,
+        "snapshot_date": published["snapshot_date"],
+        "walking": "Street routes for access and egress; estimated transfer walks.",
+        "nearby_stop_limit": 12,
+        "journey_limit_minutes": 90,
+    }
+
+
 class DashboardHandler(BaseHTTPRequestHandler):
     """Serve the dashboard shell and its read-only JSON data."""
 
@@ -611,6 +688,25 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if request.path == "/api/dashboard":
             payload = json.dumps(load_dashboard_data(), default=_json_default).encode()
             self._send(HTTPStatus.OK, payload, "application/json")
+            return
+        if request.path == "/api/places":
+            try:
+                query = parse_qs(request.query).get("q", [""])[0]
+                self._send(
+                    HTTPStatus.OK, json.dumps({"places": search_places(query)}), "application/json"
+                )
+            except ValueError as error:
+                self._send(
+                    HTTPStatus.BAD_REQUEST, json.dumps({"error": str(error)}), "application/json"
+                )
+            except requests.RequestException:
+                self._send(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    json.dumps(
+                        {"error": "Address search is unavailable. Select the location on the map."}
+                    ),
+                    "application/json",
+                )
             return
         if request.path == "/api/commute":
             try:
@@ -655,6 +751,32 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         request = urlsplit(self.path)
+        if request.path == "/api/comparison":
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if not 0 < size <= 16000:
+                    raise ValueError("Comparison request is missing or too large.")
+                if self.headers.get("X-Mobility-Action") != "compare":
+                    raise ValueError("Comparison header required.")
+                body = json.loads(self.rfile.read(size))
+                result = load_comparison(body)
+                self._send(
+                    HTTPStatus.OK, json.dumps(result, default=_json_default), "application/json"
+                )
+            except (ValueError, UnicodeError) as error:
+                self._send(
+                    HTTPStatus.BAD_REQUEST, json.dumps({"error": str(error)}), "application/json"
+                )
+            except (psycopg.Error, requests.RequestException):
+                logger.exception("comparison_unavailable")
+                self._send(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    json.dumps(
+                        {"error": "Timetable or walking routes are unavailable. Please retry."}
+                    ),
+                    "application/json",
+                )
+            return
         if request.path == "/api/refresh/cancel":
             if self.headers.get("X-Mobility-Action") != "cancel":
                 self._send(
@@ -705,6 +827,14 @@ def main() -> None:
     host = os.getenv("DASHBOARD_HOST", "0.0.0.0")
     port = int(os.getenv("DASHBOARD_PORT", "8501"))
     logger.info("dashboard_started", host=host, port=port)
+    interval = int(os.getenv("DASHBOARD_AUTO_UPDATE_HOURS", "24"))
+    if interval > 0:
+
+        def auto_update() -> None:
+            while not Event().wait(max(1, interval) * 3600):
+                start_refresh()
+
+        Thread(target=auto_update, name="timetable-updates", daemon=True).start()
     ThreadingHTTPServer((host, port), DashboardHandler).serve_forever()
 
 

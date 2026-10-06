@@ -10,6 +10,9 @@ from milano_mobility import web
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    os.getenv("TEST_LIVE_FEED") != "1", reason="Requires a preloaded official Milan timetable"
+)
 def test_commute_reads_published_timetable(monkeypatch: pytest.MonkeyPatch) -> None:
     """Exercise BI grants, calendar joins and routing without modifying the feed."""
     monkeypatch.setenv("POSTGRES_HOST", os.getenv("TEST_POSTGRES_HOST", "localhost"))

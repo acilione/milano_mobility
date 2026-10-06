@@ -86,8 +86,9 @@ export function createCommuteMap(
   const dates = [...new Set(serviceDays.map(d => d.service_date))].sort();
   const selectedDate = dates.includes(today) ? today : dates.find(d => d > today) ?? dates.at(-1) ?? "";
   root.innerHTML = `
-    <div class="commute-heading"><div><div class="eyebrow">Your everyday journey</div><h2>Where could you live?</h2>
-      <p>Choose where you work or study. Explore the places you could commute from.</p></div><span class="tag">Arrive by · Milan time</span></div>
+    <div class="commute-heading"><div><div class="eyebrow">Scheduled public transport</div><h2>Commute area</h2>
+      <p>Find areas within your chosen travel time of work or study.</p></div><span class="tag">Arrive by · Milan time</span></div>
+    <ol class="area-instructions"><li><strong>Set a destination.</strong> Choose a stop or click the map.${saved?'':' Duomo is selected as an example.'}</li><li><strong>Set your limits.</strong> Choose a date, arrival time and maximum commute, then calculate.</li><li><strong>Inspect the result.</strong> The colours show travel-time bands. Select a reachable stop to see its journey.</li></ol>
     <div class="commute-layout"><form class="commute-controls">
       <label for="commute-search">Work or study destination</label>
       <input id="commute-search" type="search" list="commute-places" placeholder="Find a stop or station" autocomplete="off">
@@ -99,15 +100,15 @@ export function createCommuteMap(
       <label for="commute-budget">Maximum commute</label><select id="commute-budget"><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select>
       <label for="commute-walk">Maximum walk per leg</label><select id="commute-walk"><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="15">15 minutes</option></select>
       <p class="field-help">Includes walking, waiting and up to 2 transfers, with 2 minutes allowed for each transfer.</p>
-      <button class="commute-submit" type="submit">Find my commute area <span aria-hidden="true">↗</span></button>
-      <button class="commute-save" type="button">Save these preferences</button>
+      <button class="commute-submit" type="submit">Calculate commute area</button>
+      <button class="commute-save" type="button">Save preferences</button>
       <p id="commute-status" role="status" aria-live="polite">Preparing the map…</p>
     </form><div class="commute-map-wrap"><div id="commute-map" role="region" aria-label="Commute areas: click to choose a destination"></div>
       <div class="commute-legend" aria-label="Estimated commute time">${[15,30,45,60].map((n,i) => `<span data-band="${n}"><i style="background:${colors[i]}"></i>≤ ${n} min</span>`).join("")}</div>
       <div class="commute-map-note">Click an area to move your destination · click a stop to inspect a journey</div></div></div>
     <div class="commute-assumptions"><strong>Scheduled travel, approximate walking.</strong> Shaded areas estimate walks at 4.5 km/h with a 30% distance allowance, displayed in 100 m cells. Streets, barriers, station entrances and accessibility are not modeled. Live delays and cancellations are not included. Walking-only areas use the same per-leg limit.</div>
-    <div class="commute-results"><div><h3 id="commute-count">Explore your commute</h3><p id="commute-summary">Select a destination and calculate an area.</p><div id="commute-stop-list" class="commute-stop-list"></div></div>
-      <aside id="commute-journey" aria-live="polite"><h3>A closer look</h3><p>Select a reachable stop to see its scheduled journey to your destination. The shaded area around it adds a walk to that stop.</p></aside></div>`;
+    <div class="commute-results"><div><h3 id="commute-count">Reachable stops</h3><p id="commute-summary">Select a destination and calculate an area.</p><div id="commute-stop-list" class="commute-stop-list"></div></div>
+      <aside id="commute-journey" aria-live="polite"><h3>Journey details</h3><p>Select a reachable stop to see its scheduled journey to your destination. The shaded area around it adds a walk to that stop.</p></aside></div>`;
   const get = <T extends HTMLElement>(selector: string): T => root.querySelector<T>(selector)!;
   const status = get<HTMLElement>("#commute-status");
   const date = get<HTMLSelectElement>("#commute-date");
@@ -139,9 +140,9 @@ export function createCommuteMap(
     request?.abort(); result = null;
     source("commute-areas")?.setData(empty); source("commute-stops")?.setData(empty);
     get("#commute-stop-list").replaceChildren();
-    get("#commute-count").textContent = "Ready to explore";
+    get("#commute-count").textContent = "Calculation required";
     get("#commute-summary").textContent = "Calculate again to see this selection.";
-    get("#commute-journey").innerHTML = "<h3>A closer look</h3><p>Select a reachable stop after calculating your commute.</p>";
+    get("#commute-journey").innerHTML = "<h3>Journey details</h3><p>Select a reachable stop after calculating your commute.</p>";
     status.textContent = "Preferences changed. Calculate to update the map.";
     submit.disabled = false;
   };
@@ -180,7 +181,7 @@ export function createCommuteMap(
       get("#commute-count").textContent = `${result.stops.length.toLocaleString()} reachable stops`;
       get("#commute-summary").textContent = `Within ${payload.minutes} minutes of ${placeName} · arrive by ${clock.value}, ${payload.date}. Timetable published ${payload.snapshot_date}.`;
       get("#commute-stop-list").innerHTML = result.stops.map((s, i) => `<button type="button" data-stop="${i}"><span>${escape(s.stop_name)}</span><strong>${s.minutes} min <span aria-hidden="true">↗</span></strong></button>`).join("");
-      status.textContent = `${payload.date !== today ? `Showing ${payload.date}. ` : ""}${result.stops.some(s => s.legs.some(l => l.mode === "transit")) ? "Your commute area is ready." : "No transit journey reaches this destination in the selected window. Showing walking access."}`;
+      status.textContent = `${payload.date !== today ? `Showing ${payload.date}. ` : ""}${result.stops.some(s => s.legs.some(l => l.mode === "transit")) ? "Calculation complete." : "No transit journey reaches this destination in the selected window. Showing walking access."}`;
     } catch (error) {
       if (token === generation && !(error instanceof DOMException && error.name === "AbortError")) {
         status.textContent = error instanceof Error ? error.message : "Could not calculate. Please retry.";

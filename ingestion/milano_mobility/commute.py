@@ -46,6 +46,8 @@ def reachable_stops(
     deadline: int,
     budget: int,
     walk_limit: int,
+    *,
+    destination_walks: dict[str, int | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Reverse connection scans, one round per boarding (at most three).
 
@@ -59,8 +61,12 @@ def reachable_stops(
     earliest = deadline - budget
     best: dict[str, Journey] = {}
     for stop, point in coordinates.items():
-        walk = walking_seconds(point, destination)
-        if walk <= min(walk_limit, budget):
+        walk = (
+            walking_seconds(point, destination)
+            if destination_walks is None
+            else destination_walks.get(stop)
+        )
+        if walk is not None and walk <= min(walk_limit, budget):
             best[stop] = Journey(
                 deadline - walk,
                 (
