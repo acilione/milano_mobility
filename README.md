@@ -6,13 +6,27 @@ Milano Mobility compares Milan addresses by nearby places and scheduled travel. 
 to three addresses and tick the ones to include. The same address list is shared between
 the nearby-place and journey tools and saved in your browser when storage is available.
 
-**Compare nearby places** finds cafés, supermarkets/convenience shops, cinemas,
-pharmacies, restaurants, parks, post offices, banks/ATMs, healthcare and gyms. Choose
+**Compare nearby places** finds cafés, supermarkets, cinemas, bookshops, libraries,
+pharmacies, restaurants, parks, post offices, banks, medical care and gyms. Choose
 categories, a 500/1,000/1,500 m search radius and a 5/10/15/20 minute walking limit.
 Each category shows checked places within that walking time and the closest checked
-walking time. Expand a category to inspect places and display pedestrian routes with
-directions. Toggle addresses or previously loaded categories to update the table without
+walking time in a compact table beside the address and category controls. Select a cell
+to inspect places and pedestrian routes in a detail window. Green marks the shortest
+verified walk when all compared addresses have complete checks and uncapped shortlists.
+On smaller screens, use **Addresses & filters** to open the controls. Toggle addresses or previously loaded categories to update the table without
 another lookup; newly selected categories need a new comparison.
+
+Category definitions are shared by discovery, classification and the interface in
+`ingestion/milano_mobility/category_rules.json`. Each category requires explicit service
+tags; related types, names and brands alone do not qualify. Ambiguous types and records
+explicitly marked inactive or private/no-access are excluded. A place can belong to
+multiple categories only when each has independent evidence. **Categories & data**
+explains the definitions; place details show the recorded type and access restrictions.
+The rules follow OpenStreetMap's documented [amenities](https://wiki.openstreetmap.org/wiki/Key:amenity),
+[shops](https://wiki.openstreetmap.org/wiki/Key:shop), and
+[leisure facilities](https://wiki.openstreetmap.org/wiki/Key:leisure).
+Strict matching can omit incompletely tagged places and cannot verify the accuracy of
+source records. Classification is not an independent check of services or opening status.
 
 Places come from OpenStreetMap through Overpass. They may be incomplete or outdated.
 For each address/category, the nearest **20 mapped candidates by straight-line distance**

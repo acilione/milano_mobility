@@ -5,6 +5,7 @@ COPY frontend/package.json frontend/package-lock.json frontend/tsconfig.json ./
 RUN npm ci
 COPY frontend/src ./src
 COPY frontend/scripts ./scripts
+COPY ingestion/milano_mobility/category_rules.json /ingestion/milano_mobility/category_rules.json
 RUN npm run typecheck && npm run build
 
 FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba

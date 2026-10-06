@@ -126,9 +126,18 @@ The response includes `pipeline_run_id` for map/snapshot consistency checks.
 `POST /api/nearby` accepts `addresses: [{name, point: [lon, lat]}]` (1–3), category IDs,
 `radius` (500/1000/1500 metres), and `minutes` (5/10/15/20). Supported categories are
 `cafe`, `supermarket`, `cinema`, `pharmacy`, `restaurant`, `park`, `post_office`, `bank`,
-`healthcare`, and `gym`. Supermarkets include convenience shops; banks include ATMs.
-Overpass discovery is cached by point/radius/UTC day. Private/no-access entries and
-polygon centres outside the search radius are excluded.
+`healthcare`, `gym`, `bookshop`, and `library`. Bookshops use `shop=books`; libraries use
+`amenity=library`. Category matching is defined in the versioned `category_rules.json`,
+shared with the frontend. Positive rule alternatives require all their tags; optional
+constraints reject contradictory subtype data. Primary types match exactly; only
+`sport` supports semicolon-delimited activities. Names, brands, building types and
+untyped parent facilities are not classification evidence. Supermarkets exclude
+convenience shops, parks exclude gardens, and banks exclude standalone ATMs. Medical
+care includes explicitly mapped doctors, clinics and hospitals, preserving the subtype.
+Overpass discovery is cached by point/radius/UTC day. Private/no-access, explicit
+lifecycle/closed records, conflicting current/lifecycle types and polygon centres outside
+the search radius are excluded. A historical lifecycle type different from the current
+service does not by itself exclude the current service.
 
 Each address has `status: ready` or `unavailable`. For each selected category:
 
@@ -139,7 +148,13 @@ Each address has `status: ready` or `unavailable`. For each selected category:
 - `unknown_count`: checked candidates with no route or a snap beyond 100 m.
 - `nearest_seconds`: shortest verified walking time among checked candidates, even when
   beyond the selected walking limit; null if no walking time could be verified.
-- `places`: reachable candidates, including recorded hours, OSM link and coordinates.
+- `places`: reachable candidates, including recorded hours, OSM link and coordinates;
+  `classification` maps category IDs to supporting tags, and `source_tags` preserves
+  relevant type, activity, access, fee and membership values. Missing names are displayed
+  as "Unnamed mapped place" rather than invented from the category.
+
+The response includes `classification_version`, plus the label and description of each
+selected category. Update the version when changing the shared classification rules.
 
 Retrieval and OSM timestamps accompany successful address results. Provider failure is
 not represented as an empty category. Counts represent OSM objects and may include

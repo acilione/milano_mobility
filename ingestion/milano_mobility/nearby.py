@@ -11,32 +11,23 @@ from typing import Any
 
 import requests
 
+from milano_mobility.category_rules import (
+    CATALOG,
+    CATEGORIES,
+    EVIDENCE_KEYS,
+    classify_place,
+    discovery_selectors,
+)
 from milano_mobility.commute import walking_seconds
 from milano_mobility.places import HEADERS, _request, valid_point
 
-CATEGORIES = {
-    "cafe": ("Cafés", "amenity", ("cafe",)),
-    "supermarket": ("Supermarkets", "shop", ("supermarket", "convenience")),
-    "cinema": ("Cinemas", "amenity", ("cinema",)),
-    "pharmacy": ("Pharmacies", "amenity", ("pharmacy",)),
-    "restaurant": ("Restaurants", "amenity", ("restaurant",)),
-    "park": ("Parks", "leisure", ("park", "garden")),
-    "post_office": ("Post offices", "amenity", ("post_office",)),
-    "bank": ("Banks / ATMs", "amenity", ("bank", "atm")),
-    "healthcare": ("Healthcare", "amenity", ("clinic", "doctors", "hospital")),
-    "gym": ("Gyms", "leisure", ("fitness_centre", "sports_centre")),
-}
 _POI_LOCK = Lock()
 CANDIDATE_LIMIT = 20
 
 
 @lru_cache(maxsize=64)
 def _places(point: tuple[float, float], radius: int, day: str) -> dict[str, Any]:
-    lon, lat = point
-    selectors = [
-        f'nwr(around:{radius},{lat:.6f},{lon:.6f})["{key}"~"^({"|".join(values)})$"];'
-        for _, key, values in CATEGORIES.values()
-    ]
+    selectors = discovery_selectors(point, radius)
     query = "[out:json][timeout:25][maxsize:16777216];(" + "".join(selectors) + ");out center tags;"
     with _POI_LOCK:
         response = requests.post(
@@ -60,7 +51,8 @@ def _places(point: tuple[float, float], radius: int, day: str) -> dict[str, Any]
     for element in payload["elements"]:
         try:
             tags = element["tags"]
-            if tags.get("access") in {"private", "no"}:
+            classification = classify_place(tags)
+            if not classification:
                 continue
             center = element.get("center", element)
             position = valid_point([center["lon"], center["lat"]])
@@ -71,19 +63,17 @@ def _places(point: tuple[float, float], radius: int, day: str) -> dict[str, Any]
             if element["type"] not in {"node", "way", "relation"} or identifier in seen:
                 continue
             seen.add(identifier)
-            categories = [
-                key for key, (_, tag, values) in CATEGORIES.items() if tags.get(tag) in values
-            ]
-            if not categories:
-                continue
+            categories = list(classification)
             places.append(
                 {
                     "id": identifier,
-                    "name": str(
-                        tags.get("name") or tags.get("brand") or CATEGORIES[categories[0]][0]
-                    ),
+                    "name": str(tags.get("name") or tags.get("brand") or "Unnamed mapped place"),
                     "point": position,
                     "categories": categories,
+                    "classification": classification,
+                    "source_tags": {
+                        key: tags[key] for key in EVIDENCE_KEYS if isinstance(tags.get(key), str)
+                    },
                     "address": " ".join(
                         str(tags[k]) for k in ("addr:street", "addr:housenumber") if tags.get(k)
                     ),
@@ -233,7 +223,11 @@ def compare_nearby(payload: Any) -> dict[str, Any]:
             )
     return {
         "addresses": output,
-        "categories": [{"id": c, "label": CATEGORIES[c][0]} for c in categories],
+        "categories": [
+            {"id": c, "label": CATEGORIES[c]["label"], "description": CATEGORIES[c]["description"]}
+            for c in categories
+        ],
+        "classification_version": CATALOG["version"],
         "radius": radius,
         "minutes": minutes,
         "candidate_limit": CANDIDATE_LIMIT,

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "categories": [
+    {"id":"cafe","label":"Cafés","description":"Places explicitly mapped as cafés. Bars, coffee retailers and bakeries do not count unless a café is separately identified.","matches":[{"amenity":["cafe"]}]},
+    {"id":"supermarket","label":"Supermarkets","description":"Shops explicitly mapped as supermarkets. Convenience stores, grocery stalls and specialist food shops are excluded.","matches":[{"shop":["supermarket"]}]},
+    {"id":"cinema","label":"Cinemas","description":"Venues explicitly mapped as cinemas. Theatres, arts centres and screening equipment alone do not qualify.","matches":[{"amenity":["cinema"]}]},
+    {"id":"bookshop","label":"Bookshops","description":"Shops primarily selling books. Libraries, public bookcases and stationery shops are separate types.","matches":[{"shop":["books"]}]},
+    {"id":"library","label":"Libraries","description":"Facilities explicitly mapped as libraries. Bookshops, book-exchange boxes and archives alone do not qualify. Admission rules may apply.","matches":[{"amenity":["library"]}]},
+    {"id":"pharmacy","label":"Pharmacies","description":"Facilities explicitly mapped as pharmacies. Cosmetics shops, herbalists and other health retailers are excluded.","matches":[{"amenity":["pharmacy"]}]},
+    {"id":"restaurant","label":"Restaurants","description":"Venues explicitly mapped as restaurants. Fast-food outlets, cafés, bars and food shops alone do not qualify.","matches":[{"amenity":["restaurant"]}]},
+    {"id":"park","label":"Parks","description":"Areas explicitly mapped as parks. Gardens, playgrounds, grass verges and other green land are excluded.","matches":[{"leisure":["park"]}]},
+    {"id":"post_office","label":"Post offices","description":"Facilities explicitly mapped as post offices. Post boxes, parcel lockers and collection points alone do not qualify.","matches":[{"amenity":["post_office"]}]},
+    {"id":"bank","label":"Banks","description":"Facilities explicitly mapped as bank branches. Standalone ATMs and financial-company offices are excluded.","matches":[{"amenity":["bank"]}]},
+    {"id":"healthcare","label":"Medical care","description":"Doctor practices, clinics and hospitals explicitly mapped as such. These are different services, not interchangeable emergency-care options; the recorded type appears with each place.","matches":[{"amenity":["doctors","clinic","hospital"]},{"healthcare":["doctor","clinic","hospital"]}]},
+    {"id":"gym","label":"Gyms","description":"Fitness centres, or sports centres explicitly offering fitness training. General sports venues and facilities dedicated to other sports are excluded.","matches":[{"leisure":["fitness_centre"]},{"leisure":["sports_centre"],"sport":["fitness","bodybuilding","weightlifting","crossfit","circuit_training"]}],"optional_constraints":{"sport":["fitness","bodybuilding","weightlifting","crossfit","circuit_training"]}}
+  ]
+}

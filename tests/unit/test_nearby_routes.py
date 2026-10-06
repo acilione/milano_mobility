@@ -121,6 +121,47 @@ def test_osm_discovery_filters_duplicates_private_and_remote_places(
     nearby._places.cache_clear()
 
 
+def test_bookshops_and_libraries_have_separate_discovery_and_walking_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    nearby._places.cache_clear()
+    node = {"type": "node", "lat": 45.46, "lon": 9.2}
+
+    class Response:
+        def raise_for_status(self) -> None:
+            pass
+
+        def json(self) -> Any:
+            return {
+                "elements": [
+                    dict(node, id=1, tags={"shop": "books", "name": "Bookshop"}),
+                    dict(node, id=2, tags={"amenity": "library", "name": "Library"}),
+                    dict(node, id=3, tags={"shop": "stationery"}),
+                    dict(node, id=4, tags={"amenity": "library", "access": "private"}),
+                ]
+            }
+
+    def discover(*args: Any, **kwargs: Any) -> Response:
+        query = kwargs["data"]["data"]
+        assert '["shop"~"^(books)$"]' in query
+        assert '["amenity"~"^(library)$"]' in query
+        return Response()
+
+    monkeypatch.setattr(nearby.requests, "post", discover)
+    monkeypatch.setattr(nearby, "walking_times", lambda origin, destinations: [120, 720])
+    try:
+        result = nearby.compare_nearby(dict(selection(), categories=["bookshop", "library"]))
+        groups = result["addresses"][0]["categories"]
+        assert groups["bookshop"]["mapped_count"] == 1
+        assert groups["bookshop"]["reachable_count"] == 1
+        assert groups["bookshop"]["places"][0]["name"] == "Bookshop"
+        assert groups["library"]["mapped_count"] == 1
+        assert groups["library"]["reachable_count"] == 0
+        assert groups["library"]["nearest_seconds"] == 720
+    finally:
+        nearby._places.cache_clear()
+
+
 def test_walking_table_keeps_unknown_and_rejects_bad_data(monkeypatch: pytest.MonkeyPatch) -> None:
     nearby.walking_times.cache_clear()
     payload = {

@@ -1,5 +1,46 @@
 # Test report
 
+## Category classification audit — 2026-10-06
+
+- 206 unit tests passed with 85.61% overall coverage and 100% statement coverage of
+  the classification module. Cases span all twelve categories: explicit positive
+  service tags, related but different types, misleading names/brands, ambiguous
+  primary types, multiple independently mapped services, lifecycle conflicts,
+  restricted access, category provenance and missing names.
+- TypeScript, the frontend build, Ruff, formatting and strict mypy (17 modules) passed.
+  A wheel built in an isolated temporary directory includes the shared JSON catalog
+  and classification module. The frontend Docker stage now copies that catalog too.
+- A live browser comparison around Piazza del Duomo successfully queried all twelve
+  categories with the new generated Overpass filters and pedestrian routing. Results
+  retained their supporting tags; place details displayed the recorded subtype and
+  category definition. The category reference displayed all twelve definitions.
+- Browser regression checks passed for three addresses, all categories, selection
+  toggles, route dialogs, autocomplete, provider failures and mobile controls. The
+  overview still fits at 1366 × 768 and 390 × 844 (mobile filters collapsed), with
+  no page errors or horizontal document overflow.
+
+These checks validate classification rules against recorded tags, not the independent
+truth of every source record. Strict rules can exclude incompletely tagged services.
+
+## Compact nearby comparison and book categories — 2026-10-06
+
+- 139 unit tests passed. The added discovery-to-comparison test separates bookshops
+  (`shop=books`) from libraries (`amenity=library`), excludes private libraries and
+  stationery shops, and verifies the walking limit independently for both categories.
+- TypeScript, the production frontend build, Ruff, formatting and strict mypy passed.
+- Chromium tested three addresses and all twelve categories using controlled responses.
+  At 1366 × 768 the controls, table and source notes fit without document scrolling.
+  At 390 × 844 the entire overview fits with the mobile filters collapsed. Smaller
+  viewports and enlarged text retain normal scrolling; place details scroll separately.
+- Browser checks covered immediate address/category toggles, incomplete-data markers,
+  shortest-walk highlights, modal routes and directions, Escape/close cleanup, source
+  details, mobile filters, unavailable/failed providers, keyboard autocomplete and
+  address addition/removal. No page errors or horizontal document overflow occurred.
+- Live Overpass and pedestrian routing returned 17 mapped bookshops near Porta Genova,
+  with 13 reachable within 15 minutes. A live browser comparison around Piazza del
+  Duomo returned both categories, including 12 mapped libraries and 11 reachable
+  libraries. These are provider results at test time, not completeness guarantees.
+
 ## Address amenities and inline routes — 2026-10-06
 
 - 138 unit tests passed with 85.09% measured coverage; nearby discovery/comparison reached
