@@ -74,6 +74,7 @@ def reachable_stops(
                         "mode": "walk",
                         "from": names[stop],
                         "to": "Destination",
+                        "coordinates": [point, destination],
                         "departure": deadline - walk,
                         "arrival": deadline,
                     },
@@ -124,6 +125,8 @@ def reachable_stops(
                             "to": names[c.destination],
                             "departure": c.departure,
                             "arrival": c.arrival,
+                            "trip_id": c.trip.split(":", 1)[-1],
+                            "coordinates": [coordinates[c.origin], coordinates[c.destination]],
                         },
                         *onward.legs,
                     ),
@@ -131,7 +134,12 @@ def reachable_stops(
             elif c.trip in onboard:
                 previous = onboard[c.trip]
                 first = dict(
-                    previous.legs[0], **{"from": names[c.origin], "departure": c.departure}
+                    previous.legs[0],
+                    **{
+                        "from": names[c.origin],
+                        "departure": c.departure,
+                        "coordinates": [coordinates[c.origin], *previous.legs[0]["coordinates"]],
+                    },
                 )
                 onboard[c.trip] = Journey(c.departure, (first, *previous.legs[1:]))
             journey = onboard.get(c.trip)
@@ -161,6 +169,7 @@ def reachable_stops(
                                 "to": names[stop],
                                 "departure": departure,
                                 "arrival": departure + walk,
+                                "coordinates": [coordinates[other], coordinates[stop]],
                             },
                             *legs,
                         )

@@ -32,6 +32,7 @@ x-runtime-environment: &runtime-environment
   DASHBOARD_AUTO_UPDATE_HOURS: ${DASHBOARD_AUTO_UPDATE_HOURS:-24}
   GEOCODER_URL: ${GEOCODER_URL:-https://photon.komoot.io/api/}
   WALK_ROUTER_URL: ${WALK_ROUTER_URL:-https://routing.openstreetmap.de/routed-foot}
+  OVERPASS_URL: ${OVERPASS_URL:-https://overpass-api.de/api/interpreter}
   LOCAL_ARCHIVE_DIRECTORY: ${LOCAL_ARCHIVE_DIRECTORY:-}
   DBT_PROJECT_DIR: /workspace/transformations/dbt
   DBT_PROFILES_DIR: /workspace/transformations/dbt

@@ -299,3 +299,5 @@ export function createMap(
     },
   };
 }
+
+export {createNearby} from './nearby';

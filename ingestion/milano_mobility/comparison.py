@@ -36,7 +36,7 @@ def validate_comparison(payload: Any) -> dict[str, Any]:
         walk = payload["walk"]
         if type(walk) is not int or walk not in (5, 10, 15):
             raise ValueError
-        apartments = payload["apartments"]
+        apartments = payload.get("addresses", payload.get("apartments"))
         if not isinstance(apartments, list) or not 1 <= len(apartments) <= 3:
             raise ValueError
         normalized = []
@@ -54,7 +54,7 @@ def validate_comparison(payload: Any) -> dict[str, Any]:
             )
     except (KeyError, TypeError, ValueError, OverflowError) as error:
         raise ValueError(
-            "Select a destination, 1-3 apartments, office days, valid times "
+            "Select a destination, 1-3 addresses, travel days, valid times "
             "and optional non-negative monthly rents."
         ) from error
     return {
@@ -126,7 +126,7 @@ def select_journey(
                 [
                     {
                         "mode": "walk",
-                        "from": "Apartment",
+                        "from": "Address",
                         "to": "Destination",
                         "departure": deadline - direct_walk,
                         "arrival": deadline,
@@ -147,7 +147,7 @@ def select_journey(
         legs = [
             {
                 "mode": "walk",
-                "from": "Apartment",
+                "from": "Address",
                 "to": stop["stop_name"],
                 "departure": departure,
                 "arrival": stop["departure"],
@@ -167,6 +167,11 @@ def select_journey(
                     "to": leg["from"],
                     "departure": -leg["arrival"],
                     "arrival": -leg["departure"],
+                    **(
+                        {"coordinates": list(reversed(leg["coordinates"]))}
+                        if "coordinates" in leg
+                        else {}
+                    ),
                 },
             )
             for leg in reversed(legs)
@@ -213,7 +218,7 @@ def compare_day(
     later = reachable_stops(
         stops, reversed_evening, target, -leave - 600, 5400, walk, destination_walks=access[0]
     )
-    return [
+    results = [
         {
             "outbound": select_journey(outbound, access[i], direct[i][0], arrive, walk),
             "return": select_journey(inbound, egress[i], direct[0][i], -leave, walk, True),
@@ -223,3 +228,23 @@ def compare_day(
         }
         for i in range(1, len(settings["apartments"]) + 1)
     ]
+    for address, result in zip(settings["apartments"], results, strict=True):
+        for journey in result.values():
+            if not journey:
+                continue
+            for leg in journey["legs"]:
+                if "coordinates" not in leg:
+                    endpoints = {"Address": address["point"], "Destination": target}
+                    if leg["from"] in endpoints and leg["to"] in endpoints:
+                        leg["coordinates"] = [endpoints[leg["from"]], endpoints[leg["to"]]]
+                    elif leg["from"] == "Address":
+                        leg["coordinates"] = [
+                            address["point"],
+                            journey["legs"][1]["coordinates"][0],
+                        ]
+                    elif leg["to"] == "Address":
+                        leg["coordinates"] = [
+                            journey["legs"][-2]["coordinates"][-1],
+                            address["point"],
+                        ]
+    return results

@@ -2,36 +2,52 @@
 
 [![CI](https://github.com/acilione/milano_mobility/actions/workflows/ci.yml/badge.svg)](https://github.com/acilione/milano_mobility/actions/workflows/ci.yml)
 
-Milano Mobility compares apartments by rent and scheduled travel to a workplace or
-university using Milan's official public transport timetable. Select a destination and
-up to three apartment addresses, enter optional monthly rents, and choose a week, office
-days, arrival time and return departure time. The comparison shows morning and return
-journeys, walking, transfers and total travel time across the selected days.
+Milano Mobility compares Milan addresses by nearby places and scheduled travel. Add up
+to three addresses and tick the ones to include. The same address list is shared between
+the nearby-place and journey tools and saved in your browser when storage is available.
 
-Choose a tool from the three cards at the top of the page. **Compare apartments** guides
-you through destination, apartments and travel days, with validation at each step.
-**Explore commute areas** finds areas within a travel-time limit. **Explore the transport
-network** shows stops, routes and service calendars. Switching tools retains your inputs.
-After calculation, the page moves to the results; open a date to inspect the journey.
-Map pins are placed only after choosing the explicit map-placement action. The map
-automatically frames your selected locations. Optional saving, sharing and data details
-are available in expandable sections.
+**Compare nearby places** finds cafés, supermarkets/convenience shops, cinemas,
+pharmacies, restaurants, parks, post offices, banks/ATMs, healthcare and gyms. Choose
+categories, a 500/1,000/1,500 m search radius and a 5/10/15/20 minute walking limit.
+Each category shows checked places within that walking time and the closest checked
+walking time. Expand a category to inspect places and display pedestrian routes with
+directions. Toggle addresses or previously loaded categories to update the table without
+another lookup; newly selected categories need a new comparison.
 
-Expand a day's result to inspect its walking and transit legs, or see the effect of
-leaving work ten minutes later. Save settings in your browser, copy a comparison link,
-or export the results as CSV. Shared links contain the selected locations, rents and
-schedule; recipients need access to the same running application. A localhost link is
-only usable on the machine running the app.
+Places come from OpenStreetMap through Overpass. They may be incomplete or outdated.
+For each address/category, the nearest **20 mapped candidates by straight-line distance**
+are checked against street routes. The interface distinguishes mapped, checked, reachable
+and unknown-route counts. Results are a bounded shortlist, not an exhaustive business
+count; the closest checked route is not guaranteed to be the closest of all mapped
+places. Building centres can differ from entrances. Recorded opening hours are not a
+live open/closed check. Nearby reachability currently uses walking only.
+
+**Compare journeys** guides you through destination, addresses and travel days. Select
+a common destination and an arrival/return schedule to compare morning and return travel,
+walking, transfers and totals across the selected days. Open a date and select **Show
+route map** to display the journey directly in its details. Transit maps use official
+GTFS shape segments matched to the scheduled stops; missing geometry is shown explicitly
+as dashed stop-to-stop links. Pedestrian segments use street routes, with estimated short
+access links marked separately. The maps do not revise scheduled transfer times.
+
+**Explore commute areas** finds areas within a travel-time limit and offers inline
+journey maps for selected stops. **Explore the transport network** shows stops, routes
+and service calendars. Switching tools retains your inputs. Map pins in the comparison
+are placed only after choosing the explicit map-placement action.
+
+Save travel settings in your browser, copy a comparison link, or export journeys as CSV.
+Shared links contain selected locations and the schedule; recipients need access to
+the same running application. A localhost link is only usable on its host machine.
 
 Address fields suggest Milan streets and addresses through Photon after three characters
 and a short typing pause. Select with the mouse or arrow keys and Enter; Escape closes
-suggestions. The Search button also performs an immediate lookup. Apartment and destination
+suggestions. The Search button also performs an immediate lookup. Address and destination
 access walks use FOSSGIS pedestrian street routing. Up to twelve nearby boarding stops
 per location are considered, with a 90-minute search window each way. Transfer walks
 remain estimates; station entrances and accessibility are not verified. Search queries
 are sent as you type, and walking coordinates are sent to the routing provider. No account is required.
-Weekly totals are withheld if any selected date or round trip is unavailable. Rent
-does not include fares or other housing costs. Night shifts across dates are unsupported.
+Weekly totals are withheld if any selected date or round trip is unavailable. Night shifts
+across dates are unsupported.
 
 The **Explore commute areas** tool also lets you explore areas within 15,
 30, 45 or 60 minutes of a destination and inspect journeys from reachable stops.
@@ -97,7 +113,7 @@ updates. The comparison displays the timetable's service-date coverage and flags
 For an existing installation, build the new commute tables once, then rebuild the app:
 
 ```bash
-docker compose run --rm --entrypoint dbt pipeline build --select commute_connections commute_service commute_stops --project-dir /workspace/transformations/dbt --profiles-dir /workspace/transformations/dbt
+docker compose run --rm --entrypoint dbt pipeline build --select commute_connections commute_service commute_stops commute_trip_shapes --project-dir /workspace/transformations/dbt --profiles-dir /workspace/transformations/dbt
 docker compose up -d --build frontend
 ```
 
@@ -121,6 +137,12 @@ docker compose down
 The checked-in defaults are enough for the local demo. To change ports, credentials,
 source metadata, schedules, service-area settings, or the optional weather provider, copy
 `.env.example` to `.env` and edit only the values you need. `.env` is ignored by Git.
+
+`OVERPASS_URL` configures nearby-place discovery (default: `https://overpass-api.de/api/interpreter`).
+Small local requests are cached per address/radius/day and serialized; pedestrian requests
+are cached and spaced at least 1.1 seconds apart. Use a dedicated Overpass instance for a
+public application, following the [Overpass resource guidance](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html).
+No background city-wide scraping is performed.
 
 `GEOCODER_URL` and `WALK_ROUTER_URL` configure the Photon and pedestrian OSRM services.
 The defaults use public services with cached, rate-limited requests. For public traffic,

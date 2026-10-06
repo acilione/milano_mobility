@@ -85,19 +85,24 @@ Commute results contain a latest departure and ordered walking/transit legs per 
 Leg times are seconds relative to midnight on the selected date; negative times belong
 to the previous calendar day. Walking areas are estimates, not verified pedestrian routes.
 
-### Apartment comparison API
+`marts.commute_trip_shapes` maps source pipeline run and trip ID to the official shape
+ID, indexed by run/trip. Journey maps join this to `dashboard_route_shape` and match
+scheduled stops in travel order to display the boarded segment. Missing geometry is
+explicitly labelled as a schematic connection rather than a verified street/track path.
+
+### Address journey comparison API
 
 `GET /api/places?q=...` returns up to five distinct Milan address candidates, using
 a local bounding box and filtering the provider's municipality to Milan/Milano.
 Address fields request suggestions after three characters and a 600 ms typing pause.
 `POST /api/comparison`
-accepts JSON with `destination: {name, point: [lon, lat]}`, `apartments` (one to three
-objects with `name`, `point` and optional numeric monthly `rent`), `week` (ISO date,
+accepts JSON with `destination: {name, point: [lon, lat]}`, `addresses` (one to three
+objects with `name` and `point`), `week` (ISO date,
 normalized to Monday), `days` (0 = Monday through 6 = Sunday), `arrival`, `departure`
 (HH:MM in Europe/Rome), and `walk` (5, 10 or 15 minutes per leg). The request requires
 `X-Mobility-Action: compare` and has a 16 KB size limit.
 
-Each apartment contains per-date `outbound`, `return` and `return_later` journeys,
+Each address contains per-date `outbound`, `return` and `return_later` journeys,
 including `departure`, `arrival`, `seconds`, `walking_seconds`, `transfers` and ordered
 `legs`. Times are seconds relative to midnight on that date. Journey duration includes
 connection waits; return duration also includes waiting after the requested departure.
@@ -111,6 +116,44 @@ Street access/egress considers twelve nearby boarding stops per location. Transf
 retain estimated walks and a two-minute allowance, with at most three transit boardings.
 The search is bounded to ninety minutes per direction. The API returns the source
 snapshot date and service coverage; neither implies live vehicle observations.
+Older `apartments` request/response fields remain supported for saved-link compatibility.
+New clients use `addresses` and omit excluded addresses from requests. Leg `coordinates`
+are ordered endpoints or scheduled stops; transit legs also include their source `trip_id`.
+The response includes `pipeline_run_id` for map/snapshot consistency checks.
+
+### Nearby places and route maps
+
+`POST /api/nearby` accepts `addresses: [{name, point: [lon, lat]}]` (1–3), category IDs,
+`radius` (500/1000/1500 metres), and `minutes` (5/10/15/20). Supported categories are
+`cafe`, `supermarket`, `cinema`, `pharmacy`, `restaurant`, `park`, `post_office`, `bank`,
+`healthcare`, and `gym`. Supermarkets include convenience shops; banks include ATMs.
+Overpass discovery is cached by point/radius/UTC day. Private/no-access entries and
+polygon centres outside the search radius are excluded.
+
+Each address has `status: ready` or `unavailable`. For each selected category:
+
+- `mapped_count`: mapped candidates within the search radius.
+- `checked_count`: up to 20 nearest candidates checked using pedestrian street routing.
+- `sampled`: true when more candidates were mapped than checked.
+- `reachable_count`: checked candidates with a verified route within the walking limit.
+- `unknown_count`: checked candidates with no route or a snap beyond 100 m.
+- `nearest_seconds`: shortest verified walking time among checked candidates, even when
+  beyond the selected walking limit; null if no walking time could be verified.
+- `places`: reachable candidates, including recorded hours, OSM link and coordinates.
+
+Retrieval and OSM timestamps accompany successful address results. Provider failure is
+not represented as an empty category. Counts represent OSM objects and may include
+duplicate representations of a venue; neither counts nor opening hours are exhaustive
+or live. Pedestrian times include approximate endpoint access at 4.5 km/h.
+
+`POST /api/walking-route` takes `origin` and `destination` points and returns pedestrian
+geometry, duration, distance, directions and approximate endpoint-access links.
+`POST /api/journey-map` takes ordered `legs` with mode, coordinates and optional trip/route,
+plus `pipeline_run_id`. It returns GeoJSON with `official_transit`, `street_walk`,
+`scheduled_stops`, `unverified_walk`, or `access` geometry classes. The last three are
+rendered dashed; geometry does not change timetable or transfer-time calculations.
+All three exploration endpoints require `X-Mobility-Action: explore` and limit bodies
+to 64 KB. Journey maps accept at most 12 legs, with at most 200 input coordinates per leg.
 
 ## Universal audit fields
 

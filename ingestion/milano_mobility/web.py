@@ -28,7 +28,9 @@ from milano_mobility.commute import Connection, reachable_stops
 from milano_mobility.comparison import access_walks, compare_day, validate_comparison
 from milano_mobility.config import Settings
 from milano_mobility.models import ManifestStatus, PipelineResult
-from milano_mobility.places import search_places
+from milano_mobility.nearby import compare_nearby
+from milano_mobility.places import search_places, valid_point
+from milano_mobility.route_maps import journey_map, walking_route
 
 logger = structlog.get_logger()
 STATIC_ROOT = files("milano_mobility").joinpath("static")
@@ -594,6 +596,7 @@ def load_commute(query: str) -> dict[str, Any]:
         "destination": [lon, lat],
         "snapshot_date": published["snapshot_date"],
         "connections": len(connections),
+        "pipeline_run_id": published["pipeline_run_id"],
     }
 
 
@@ -661,13 +664,49 @@ def load_comparison(payload: object) -> dict[str, Any]:
             else None
         )
     return {
-        "apartments": results,
+        "apartments": results,  # Compatibility with previously shared comparisons.
+        "addresses": results,
+        "pipeline_run_id": published["pipeline_run_id"],
         "coverage": coverage,
         "snapshot_date": published["snapshot_date"],
         "walking": "Street routes for access and egress; estimated transfer walks.",
         "nearby_stop_limit": 12,
         "journey_limit_minutes": 90,
     }
+
+
+@lru_cache(maxsize=128)
+def _trip_shape(run: str, trip: str) -> list[tuple[float, float]]:
+    parameters = _database_parameters()
+    with psycopg.connect(**parameters, row_factory=dict_row) as connection:  # type: ignore[arg-type]
+        connection.execute("SET LOCAL statement_timeout = '15s'")
+        rows = connection.execute(
+            """SELECT DISTINCT s.shape_pt_sequence, s.shape_pt_lon, s.shape_pt_lat
+            FROM marts.commute_trip_shapes t JOIN marts.dashboard_route_shape s
+              ON t.pipeline_run_id=s.pipeline_run_id AND t.shape_id=s.shape_id
+            WHERE t.pipeline_run_id=%s AND t.trip_id=%s ORDER BY s.shape_pt_sequence""",
+            (run, trip),
+        ).fetchall()
+    return [(float(r["shape_pt_lon"]), float(r["shape_pt_lat"])) for r in rows]
+
+
+def load_journey_map(payload: Any) -> dict[str, Any]:
+    # Walking-only requests work without a timetable database.
+    def shape(trip: str) -> list[tuple[float, float]]:
+        parameters = _database_parameters()
+        with psycopg.connect(**parameters, row_factory=dict_row) as connection:  # type: ignore[arg-type]
+            row = connection.execute(
+                "SELECT pipeline_run_id FROM marts.published_snapshot"
+            ).fetchone()
+        if not row:
+            return []
+        if payload.get("pipeline_run_id") and payload["pipeline_run_id"] != row["pipeline_run_id"]:
+            raise ValueError(
+                "The timetable changed. Recalculate the journey before displaying its route."
+            )
+        return _trip_shape(str(row["pipeline_run_id"]), trip)
+
+    return journey_map(payload, shape)
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
@@ -751,6 +790,39 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         request = urlsplit(self.path)
+        if request.path in {"/api/nearby", "/api/walking-route", "/api/journey-map"}:
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if not 0 < size <= 64000 or self.headers.get("X-Mobility-Action") != "explore":
+                    raise ValueError("A bounded exploration request is required.")
+                payload = json.loads(self.rfile.read(size))
+                if not isinstance(payload, dict):
+                    raise ValueError("A JSON object is required.")
+                if request.path == "/api/nearby":
+                    result = compare_nearby(payload)
+                elif request.path == "/api/walking-route":
+                    result = walking_route(
+                        valid_point(payload.get("origin")), valid_point(payload.get("destination"))
+                    )
+                else:
+                    result = load_journey_map(payload)
+                self._send(
+                    HTTPStatus.OK, json.dumps(result, default=_json_default), "application/json"
+                )
+            except (ValueError, UnicodeError) as error:
+                self._send(
+                    HTTPStatus.BAD_REQUEST, json.dumps({"error": str(error)}), "application/json"
+                )
+            except (requests.RequestException, psycopg.Error):
+                logger.exception("exploration_unavailable")
+                self._send(
+                    HTTPStatus.SERVICE_UNAVAILABLE,
+                    json.dumps(
+                        {"error": "Map data or walking routes are unavailable. Please retry."}
+                    ),
+                    "application/json",
+                )
+            return
         if request.path == "/api/comparison":
             try:
                 size = int(self.headers.get("Content-Length", "0"))

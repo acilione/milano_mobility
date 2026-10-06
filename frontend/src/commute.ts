@@ -1,11 +1,13 @@
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 import { Map as MapLibreMap, Marker, NavigationControl, GeoJSONSource } from "maplibre-gl";
 import { MAP_STYLE } from "./map";
+import {createRouteView,type MapLeg} from "./route-view";
 
 interface Place { stop_id: string; stop_name: string; stop_lat: number; stop_lon: number }
-interface Leg { mode: string; route?: string; from: string; to: string; departure: number; arrival: number }
+interface Leg extends MapLeg { mode: string; route?: string; from: string; to: string; departure: number; arrival: number }
 interface Reachable extends Place { minutes: number; departure: number; legs: Leg[] }
 interface Result {
+  pipeline_run_id?:string;
   stops: Reachable[]; date: string; deadline: number; minutes: number; walk: number;
   destination: [number, number]; snapshot_date: string; connections: number;
 }
@@ -80,6 +82,7 @@ export function createCommuteMap(
   let placeName = saved?.name ?? "Duomo · example destination";
   let request: AbortController | null = null;
   let result: Result | null = null;
+  let routeView:{destroy():void}|undefined;
   let loaded = false;
   let generation = 0;
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -136,6 +139,7 @@ export function createCommuteMap(
   showDestination();
   const source = (name: string): GeoJSONSource | undefined => map.getSource(name) as GeoJSONSource | undefined;
   const clear = (): void => {
+    routeView?.destroy();routeView=undefined;
     generation++;
     request?.abort(); result = null;
     source("commute-areas")?.setData(empty); source("commute-stops")?.setData(empty);
@@ -152,10 +156,20 @@ export function createCommuteMap(
   const inspect = (index: number): void => {
     const stop = result?.stops[index];
     if (!stop || !result) return;
+    routeView?.destroy();routeView=undefined;
     map.easeTo({ center: [Number(stop.stop_lon), Number(stop.stop_lat)], zoom: Math.max(13, map.getZoom()) });
     get("#commute-journey").innerHTML = `<h3>${escape(stop.stop_name)}</h3><p>${stop.minutes} min including arrival margin · leave by ${time(stop.departure)}</p>
-      <ol class="journey-legs">${stop.legs.map(leg => `<li><span>${time(leg.departure)} – ${time(leg.arrival)}</span><strong>${leg.mode === "walk" ? "Walk" : `Take ${escape(leg.route)}`}</strong><p>${escape(leg.from)} → ${escape(leg.to)}</p></li>`).join("")}</ol><p>Arrive by ${time(result.deadline)} on ${escape(result.date)}. Transfer gaps include walking, waiting and the transfer allowance.</p>`;
+      <button type="button" id="commute-route-button" class="secondary-button">Show route map</button><div id="commute-route-window" hidden></div><ol class="journey-legs">${stop.legs.map(leg => `<li><span>${time(leg.departure)} – ${time(leg.arrival)}</span><strong>${leg.mode === "walk" ? "Walk" : `Take ${escape(leg.route)}`}</strong><p>${escape(leg.from)} → ${escape(leg.to)}</p></li>`).join("")}</ol><p>Arrive by ${time(result.deadline)} on ${escape(result.date)}. Transfer gaps include walking, waiting and the transfer allowance.</p>`;
+    get("#commute-route-button").dataset.stop=stop.stop_id;
   };
+  root.addEventListener('click',event=>{
+    if(!(event.target as HTMLElement).closest('#commute-route-button'))return;
+    const stop=result?.stops.find(s=>s.stop_id===get('#commute-route-button').dataset.stop);
+    if(!stop)return;
+    const window=get('#commute-route-window');window.hidden=!window.hidden;
+    get('#commute-route-button').textContent=window.hidden?'Show route map':'Hide route map';
+    if(!routeView)routeView=createRouteView(window,stop.legs,result?.pipeline_run_id);
+  });
   const calculate = async (): Promise<void> => {
     if (!loaded || !date.value) return;
     clear();
@@ -229,5 +243,5 @@ export function createCommuteMap(
     void calculate();
   });
   if (!dates.length) { status.textContent = "No service dates are available in this timetable."; submit.disabled = true; }
-  return { destroy(): void { generation++; request?.abort(); observer.disconnect(); marker.remove(); map.remove(); } };
+  return { destroy(): void { routeView?.destroy();generation++; request?.abort(); observer.disconnect(); marker.remove(); map.remove(); } };
 }

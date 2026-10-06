@@ -1,5 +1,27 @@
 # Test report
 
+## Address amenities and inline routes — 2026-10-06
+
+- 138 unit tests passed with 85.09% measured coverage; nearby discovery/comparison reached
+  97%, route-map assembly 94%, and the underlying connection scan remained at 100%.
+  Cases include private/malformed/duplicate OSM entries, bounded candidate counts,
+  unknown routes, unavailable addresses, API bounds, snapping limits, official geometry,
+  fallback styling metadata, and forward/return coordinate order.
+- Ruff, formatting, strict mypy (16 modules), TypeScript checking and the frontend build
+  passed. The new `commute_trip_shapes` dbt model built 175,790 trip mappings in the
+  full-data database. Existing routing models were reused.
+- A live Overpass/OSRM comparison covered Via Padova 10 and Porta Genova across cafés,
+  supermarkets, cinemas, pharmacies, parks and post offices. Sampled categories were
+  labelled as shortlists; walking routes and directions were retrieved successfully.
+- Chromium exercised address/category inclusion toggles, shared address state, a real
+  scheduled journey with both official transit geometry and pedestrian paths, inline
+  maps in commute-area journey details, input invalidation and a 390 px mobile layout.
+  No page errors or horizontal document overflow were observed.
+
+These checks do not establish completeness of OSM amenities, current opening hours,
+accessibility or observed travel times. Nearby reachability is pedestrian only and
+checks a maximum of 20 candidates per category/address within the chosen radius.
+
 ## Guided planning workflow — 2026-10-06
 
 - TypeScript checking and the production frontend build passed.
