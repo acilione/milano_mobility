@@ -1,5 +1,25 @@
 # Test report
 
+## Compact workspaces across planning tabs — 2026-10-06
+
+- TypeScript checking, the frontend build and `git diff --check` passed.
+- Chromium verified the journey wizard, three included addresses, a collapsed address
+  list, an expanded editor and the seven-row comparison. Each desktop overview fits
+  at 1366 × 768. Results remain alongside controls; daily journeys and location maps
+  open in native dialogs with Escape support and route-map cleanup.
+- A live Via Padova-to-Duomo comparison produced scheduled morning/return journeys and
+  displayed official transit geometry plus pedestrian geometry in its route window.
+  Saving, sharing, CSV export, cancelling map placement and returning invalid inputs
+  to a visible address editor passed.
+- Commute-area checks covered the map/list workspace, reachable-stop filtering, journey
+  windows, route maps, explicit destination placement and method information.
+- Network checks covered all four views, stop search, connected-route filtering,
+  selection reset and keyboard access to calendar/hourly-chart values.
+- Journey, area and network overviews fit at 390 × 844 with mobile settings collapsed.
+  The network calendar, hourly departures and changes views also fit at 1366 × 768.
+  No page errors or horizontal document overflow occurred. Longer lists, expanded
+  details and small/zoomed viewports retain scrolling where needed.
+
 ## Category classification audit — 2026-10-06
 
 - 206 unit tests passed with 85.61% overall coverage and 100% statement coverage of

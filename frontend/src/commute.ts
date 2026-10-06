@@ -2,6 +2,7 @@ import type { Feature, FeatureCollection, Polygon } from "geojson";
 import { Map as MapLibreMap, Marker, NavigationControl, GeoJSONSource } from "maplibre-gl";
 import { MAP_STYLE } from "./map";
 import {createRouteView,type MapLeg} from "./route-view";
+import {createDialog} from "./dialog";
 
 interface Place { stop_id: string; stop_name: string; stop_lat: number; stop_lon: number }
 interface Leg extends MapLeg { mode: string; route?: string; from: string; to: string; departure: number; arrival: number }
@@ -89,30 +90,52 @@ export function createCommuteMap(
   const dates = [...new Set(serviceDays.map(d => d.service_date))].sort();
   const selectedDate = dates.includes(today) ? today : dates.find(d => d > today) ?? dates.at(-1) ?? "";
   root.innerHTML = `
-    <div class="commute-heading"><div><div class="eyebrow">Scheduled public transport</div><h2>Commute area</h2>
-      <p>Find areas within your chosen travel time of work or study.</p></div><span class="tag">Arrive by · Milan time</span></div>
-    <ol class="area-instructions"><li><strong>Set a destination.</strong> Choose a stop or click the map.${saved?'':' Duomo is selected as an example.'}</li><li><strong>Set your limits.</strong> Choose a date, arrival time and maximum commute, then calculate.</li><li><strong>Inspect the result.</strong> The colours show travel-time bands. Select a reachable stop to see its journey.</li></ol>
-    <div class="commute-layout"><form class="commute-controls">
+    <div class="planner-heading"><div><h2>Commute areas</h2><p>Choose a destination and inspect reachable stops.</p></div><div class="planner-actions"><button type="button" class="secondary-button planner-settings-toggle" aria-expanded="false" aria-controls="commute-controls">Destination & limits</button><button type="button" class="secondary-button" id="commute-info">Data & method</button></div></div>
+    <div class="commute-layout"><form class="commute-controls" id="commute-controls">
       <label for="commute-search">Work or study destination</label>
       <input id="commute-search" type="search" list="commute-places" placeholder="Find a stop or station" autocomplete="off">
       <datalist id="commute-places">${stops.map(s => `<option value="${escape(s.stop_name)} [${escape(s.stop_id)}]"></option>`).join("")}</datalist>
-      <p class="field-help">Select a stop, or click the map to place your destination precisely.</p>
+      <p class="field-help">Select a stop or place your destination on the map.</p>
       <div class="destination-card"><span class="destination-dot"></span><div><strong id="commute-destination"></strong><small id="commute-coordinates"></small></div></div>
       <div class="commute-fields"><div><label for="commute-date">Travel date</label><select id="commute-date" required>${dates.map(d => `<option value="${d}" ${d === selectedDate ? "selected" : ""}>${new Date(`${d}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</option>`).join("")}</select></div>
       <div><label for="commute-time">Arrive by</label><input id="commute-time" type="time" value="09:00" required></div></div>
       <label for="commute-budget">Maximum commute</label><select id="commute-budget"><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select>
       <label for="commute-walk">Maximum walk per leg</label><select id="commute-walk"><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="15">15 minutes</option></select>
-      <p class="field-help">Includes walking, waiting and up to 2 transfers, with 2 minutes allowed for each transfer.</p>
-      <button class="commute-submit" type="submit">Calculate commute area</button>
+      <p class="field-help">Includes walking, waiting and up to two transfers.</p>
+      <button id="commute-pin" class="secondary-button" type="button" aria-pressed="false">Place destination on map</button><button class="commute-submit" type="submit">Calculate commute area</button>
       <button class="commute-save" type="button">Save preferences</button>
       <p id="commute-status" role="status" aria-live="polite">Preparing the map…</p>
-    </form><div class="commute-map-wrap"><div id="commute-map" role="region" aria-label="Commute areas: click to choose a destination"></div>
+    </form><div class="commute-map-wrap"><div id="commute-map" role="region" aria-label="Commute areas and reachable stops"></div>
       <div class="commute-legend" aria-label="Estimated commute time">${[15,30,45,60].map((n,i) => `<span data-band="${n}"><i style="background:${colors[i]}"></i>≤ ${n} min</span>`).join("")}</div>
-      <div class="commute-map-note">Click an area to move your destination · click a stop to inspect a journey</div></div></div>
+      <div class="commute-map-note">Click a stop for its journey. Use Place destination to move the pin.</div></div></div>
     <div class="commute-assumptions"><strong>Scheduled travel, approximate walking.</strong> Shaded areas estimate walks at 4.5 km/h with a 30% distance allowance, displayed in 100 m cells. Streets, barriers, station entrances and accessibility are not modeled. Live delays and cancellations are not included. Walking-only areas use the same per-leg limit.</div>
-    <div class="commute-results"><div><h3 id="commute-count">Reachable stops</h3><p id="commute-summary">Select a destination and calculate an area.</p><div id="commute-stop-list" class="commute-stop-list"></div></div>
+    <div class="commute-results"><div><h3 id="commute-count">Reachable stops</h3><p id="commute-summary">Select a destination and calculate an area.</p><label class="visually-hidden" for="commute-stop-filter">Filter reachable stops</label><input id="commute-stop-filter" type="search" placeholder="Filter reachable stops"><p id="commute-filter-status" role="status" hidden></p><div id="commute-stop-list" class="commute-stop-list"></div></div>
       <aside id="commute-journey" aria-live="polite"><h3>Journey details</h3><p>Select a reachable stop to see its scheduled journey to your destination. The shaded area around it adds a walk to that stop.</p></aside></div>`;
   const get = <T extends HTMLElement>(selector: string): T => root.querySelector<T>(selector)!;
+  const journeyDialog=createDialog(root,'Journey details',()=>{routeView?.destroy();routeView=undefined;});
+  journeyDialog.body.append(get('#commute-journey'));
+  const stopPanel=get('.commute-results>div');stopPanel.classList.add('commute-stop-panel');
+  get('.commute-layout').append(stopPanel);get('.commute-results').remove();
+  const infoDialog=createDialog(root,'Commute area data and method');
+  infoDialog.body.append(get('.commute-assumptions'));
+  infoDialog.body.insertAdjacentHTML('afterbegin','<p>Select a destination, date and arrival time, then calculate. Colours show estimated travel-time bands. Select a reachable stop on the map or in the list to inspect its journey and route.</p>');
+  get('#commute-info').addEventListener('click',()=>infoDialog.open());
+  get('.planner-settings-toggle').addEventListener('click',()=>{
+    const expanded=root.classList.toggle('settings-open');get('.planner-settings-toggle').setAttribute('aria-expanded',String(expanded));
+  });
+  get<HTMLInputElement>('#commute-stop-filter').addEventListener('input',event=>{
+    const query=(event.target as HTMLInputElement).value.trim().toLocaleLowerCase();
+    const stops=[...get('#commute-stop-list').querySelectorAll<HTMLElement>('[data-stop]')];stops.forEach(el=>el.hidden=!el.textContent!.toLocaleLowerCase().includes(query));
+    get('#commute-filter-status').hidden=!query;get('#commute-filter-status').textContent=`${stops.filter(el=>!el.hidden).length} matching stops`;
+  });
+  let pinEditing=false;
+  const setPinEditing=(active:boolean):void=>{
+    pinEditing=active;get('#commute-pin').setAttribute('aria-pressed',String(active));get('#commute-pin').textContent=active?'Cancel destination placement':'Place destination on map';
+    get('.commute-map-note').textContent=active?'Click the map to set your destination.':'Select a reachable stop to inspect its journey.';
+    if(active){root.classList.remove('settings-open');get('.planner-settings-toggle').setAttribute('aria-expanded','false');}
+    map.getCanvas().style.cursor=active?'crosshair':'';
+  };
+  get('#commute-pin').addEventListener('click',()=>setPinEditing(!pinEditing));
   const status = get<HTMLElement>("#commute-status");
   const date = get<HTMLSelectElement>("#commute-date");
   const clock = get<HTMLInputElement>("#commute-time");
@@ -139,7 +162,7 @@ export function createCommuteMap(
   showDestination();
   const source = (name: string): GeoJSONSource | undefined => map.getSource(name) as GeoJSONSource | undefined;
   const clear = (): void => {
-    routeView?.destroy();routeView=undefined;
+    journeyDialog.close();routeView?.destroy();routeView=undefined;get<HTMLInputElement>('#commute-stop-filter').value='';get('#commute-filter-status').hidden=true;
     generation++;
     request?.abort(); result = null;
     source("commute-areas")?.setData(empty); source("commute-stops")?.setData(empty);
@@ -151,7 +174,7 @@ export function createCommuteMap(
     submit.disabled = false;
   };
   const choose = (coordinates: [number, number], name: string): void => {
-    clear(); point = coordinates; placeName = name; showDestination();
+    clear();setPinEditing(false);point = coordinates; placeName = name; showDestination();
   };
   const inspect = (index: number): void => {
     const stop = result?.stops[index];
@@ -160,7 +183,7 @@ export function createCommuteMap(
     map.easeTo({ center: [Number(stop.stop_lon), Number(stop.stop_lat)], zoom: Math.max(13, map.getZoom()) });
     get("#commute-journey").innerHTML = `<h3>${escape(stop.stop_name)}</h3><p>${stop.minutes} min including arrival margin · leave by ${time(stop.departure)}</p>
       <button type="button" id="commute-route-button" class="secondary-button">Show route map</button><div id="commute-route-window" hidden></div><ol class="journey-legs">${stop.legs.map(leg => `<li><span>${time(leg.departure)} – ${time(leg.arrival)}</span><strong>${leg.mode === "walk" ? "Walk" : `Take ${escape(leg.route)}`}</strong><p>${escape(leg.from)} → ${escape(leg.to)}</p></li>`).join("")}</ol><p>Arrive by ${time(result.deadline)} on ${escape(result.date)}. Transfer gaps include walking, waiting and the transfer allowance.</p>`;
-    get("#commute-route-button").dataset.stop=stop.stop_id;
+    get("#commute-route-button").dataset.stop=stop.stop_id;journeyDialog.open(stop.stop_name);
   };
   root.addEventListener('click',event=>{
     if(!(event.target as HTMLElement).closest('#commute-route-button'))return;
@@ -171,7 +194,7 @@ export function createCommuteMap(
     if(!routeView)routeView=createRouteView(window,stop.legs,result?.pipeline_run_id);
   });
   const calculate = async (): Promise<void> => {
-    if (!loaded || !date.value) return;
+    if (!loaded || !date.value) return;setPinEditing(false);
     clear();
     const token = generation;
     request = new AbortController(); submit.disabled = true;
@@ -183,7 +206,7 @@ export function createCommuteMap(
       const payload = await response.json() as Result & { error?: string };
       if (!response.ok) throw new Error(payload.error ?? "Could not calculate this commute.");
       if (token !== generation) return;
-      result = payload;
+      result = payload;root.classList.remove('settings-open');get('.planner-settings-toggle').setAttribute('aria-expanded','false');
       result.stops.sort((a, b) => a.minutes - b.minutes || a.stop_name.localeCompare(b.stop_name));
       const areas = walkingAreas(result);
       source("commute-areas")?.setData({ type: "FeatureCollection", features: areas });
@@ -235,13 +258,13 @@ export function createCommuteMap(
     } });
     map.on("click", event => {
       const feature = map.queryRenderedFeatures(event.point, { layers: ["commute-stops"] })[0];
-      if (feature) inspect(Number(feature.properties.index));
-      else { search.value = ""; choose([event.lngLat.lng, event.lngLat.lat], "Pinned destination"); }
+      if(pinEditing) { search.value = ""; choose([event.lngLat.lng, event.lngLat.lat], "Pinned destination"); }
+      else if(feature) inspect(Number(feature.properties.index));
     });
     map.on("mouseenter", "commute-stops", () => { map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "commute-stops", () => { map.getCanvas().style.cursor = ""; });
     void calculate();
   });
   if (!dates.length) { status.textContent = "No service dates are available in this timetable."; submit.disabled = true; }
-  return { destroy(): void { routeView?.destroy();generation++; request?.abort(); observer.disconnect(); marker.remove(); map.remove(); } };
+  return { destroy(): void { journeyDialog.destroy();infoDialog.destroy();routeView?.destroy();generation++; request?.abort(); observer.disconnect(); marker.remove(); map.remove(); } };
 }

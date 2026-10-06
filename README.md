@@ -38,16 +38,22 @@ live open/closed check. Nearby reachability currently uses walking only.
 
 **Compare journeys** guides you through destination, addresses and travel days. Select
 a common destination and an arrival/return schedule to compare morning and return travel,
-walking, transfers and totals across the selected days. Open a date and select **Show
-route map** to display the journey directly in its details. Transit maps use official
+walking, transfers and totals across the selected days. Settings sit beside the compact
+results table. Select an address's **Daily journeys & routes** button, open a date and
+select **Show route map** to display the journey in its detail window. **Locations map**
+opens the address map without replacing the results. Transit maps use official
 GTFS shape segments matched to the scheduled stops; missing geometry is shown explicitly
 as dashed stop-to-stop links. Pedestrian segments use street routes, with estimated short
 access links marked separately. The maps do not revise scheduled transfer times.
 
-**Explore commute areas** finds areas within a travel-time limit and offers inline
-journey maps for selected stops. **Explore the transport network** shows stops, routes
-and service calendars. Switching tools retains your inputs. Map pins in the comparison
-are placed only after choosing the explicit map-placement action.
+**Explore commute areas** keeps the map alongside a searchable list of reachable stops.
+Select a stop to open its journey and route map. **Transport network** provides separate
+views for stops/routes, the service calendar, hourly departures and network changes.
+Search for a stop or select it on the map to inspect its service and filter connected
+routes; **Show all routes** clears the selection. Switching tools retains your inputs.
+Both planning maps require an explicit placement action before clicks move a destination.
+On mobile, **Journey settings** and **Destination & limits** reveal their respective
+controls; calculation closes those controls to bring the results back into view.
 
 Save travel settings in your browser, copy a comparison link, or export journeys as CSV.
 Shared links contain selected locations and the schedule; recipients need access to
