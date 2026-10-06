@@ -13,7 +13,7 @@ interface Leg extends MapLeg { mode: string; route?: string; from: string; to: s
 interface Journey { departure: number; arrival: number; seconds: number; walking_seconds: number; transfers: number; legs: Leg[] }
 interface Day { date: string; status: string; reason?: string; outbound: Journey | null;
   return: Journey | null; return_later: Journey | null }
-interface AddressResult { name: string; rent: number | null; days: Day[]; weekly_seconds: number | null }
+interface AddressResult { name: string; days: Day[]; weekly_seconds: number | null }
 interface Comparison { pipeline_run_id?:string; addresses: AddressResult[]; coverage: {first: string; last: string}; snapshot_date: string }
 const escape = (value: unknown): string => String(value ?? '').replace(/[&<>"']/g,
   c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'})[c]!);
@@ -260,7 +260,7 @@ export function createComparison(root: HTMLElement, serviceDays: {service_date:s
       const index=Number(target.id.slice(8));place(index).name=target.value;place(index).point=null;
       target.closest('.location-editor')!.querySelector('.selected-location')!.textContent='Select a suggestion to confirm this address.';
       syncMarkers();invalidate();if(index>=0)publishAddresses();
-    }else if(target.matches('[data-rent]')){place(Number(target.dataset.rent)).rent=target.value===''?null:Number(target.value);invalidate();}
+    }
   });
   root.addEventListener('change',event=>{
     const target=event.target as HTMLElement;

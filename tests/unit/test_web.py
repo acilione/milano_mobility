@@ -138,7 +138,7 @@ def test_dashboard_waits_cleanly_before_marts_exist(
 
 def test_dashboard_shell_contains_primary_visuals() -> None:
     assert "Departures by service hour" in web.DASHBOARD_HTML
-    assert "Interactive stop map" in web.DASHBOARD_HTML
+    assert 'aria-label="Interactive MapLibre map of scheduled stops"' in web.DASHBOARD_HTML
     assert 'import {createMap} from "/assets/map.js"' in web.DASHBOARD_HTML
     assert 'href="/assets/maplibre-gl.css"' in web.DASHBOARD_HTML
     assert 'createMap("network-map"' in web.DASHBOARD_HTML

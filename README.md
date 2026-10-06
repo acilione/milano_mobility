@@ -2,184 +2,245 @@
 
 [![CI](https://github.com/acilione/milano_mobility/actions/workflows/ci.yml/badge.svg)](https://github.com/acilione/milano_mobility/actions/workflows/ci.yml)
 
-Milano Mobility compares Milan addresses by nearby places and scheduled travel. Add up
-to three addresses and tick the ones to include. The same address list is shared between
-the nearby-place and journey tools and saved in your browser when storage is available.
+Compare Milan addresses by nearby services and scheduled travel. Add up to three
+addresses, tick those to include, and reuse them across the nearby-place and journey
+tools. Transit results use the published timetable: live vehicle positions, delays and
+cancellations are not available.
 
-**Compare nearby places** finds cafés, supermarkets, cinemas, bookshops, libraries,
-pharmacies, restaurants, parks, post offices, banks, medical care and gyms. Choose
-categories, a 500/1,000/1,500 m search radius and a 5/10/15/20 minute walking limit.
-Each category shows checked places within that walking time and the closest checked
-walking time in a compact table beside the address and category controls. Select a cell
-to inspect places and pedestrian routes in a detail window. Green marks the shortest
-verified walk when all compared addresses have complete checks and uncapped shortlists.
-On smaller screens, use **Addresses & filters** to open the controls. Toggle addresses or previously loaded categories to update the table without
-another lookup; newly selected categories need a new comparison.
+## Using the tools
 
-Category definitions are shared by discovery, classification and the interface in
-`ingestion/milano_mobility/category_rules.json`. Each category requires explicit service
-tags; related types, names and brands alone do not qualify. Ambiguous types and records
-explicitly marked inactive or private/no-access are excluded. A place can belong to
-multiple categories only when each has independent evidence. **Categories & data**
-explains the definitions; place details show the recorded type and access restrictions.
-The rules follow OpenStreetMap's documented [amenities](https://wiki.openstreetmap.org/wiki/Key:amenity),
-[shops](https://wiki.openstreetmap.org/wiki/Key:shop), and
-[leisure facilities](https://wiki.openstreetmap.org/wiki/Key:leisure).
-Strict matching can omit incompletely tagged places and cannot verify the accuracy of
-source records. Classification is not an independent check of services or opening status.
+| Tool | What to enter | What you can inspect |
+| --- | --- | --- |
+| **Compare nearby places** | Addresses, categories, radius and walking limit | A category-by-address table. Select a cell for places, source details and walking routes. |
+| **Compare journeys** | A common destination, addresses, travel days and arrival/return times | Travel, walking and transfers. Open **Daily journeys & routes**, select a date, then **Show route map**. |
+| **Explore commute areas** | Destination, service date, arrival time and travel/walking limits | Approximate reachable areas and a searchable stop list. Select a stop for its journey and route map. |
+| **Transport network** | A stop search or map selection | Connected routes, scheduled calls, service calendar, hourly departures and network changes. **Show all routes** clears the stop selection. |
 
-Places come from OpenStreetMap through Overpass. They may be incomplete or outdated.
-For each address/category, the nearest **20 mapped candidates by straight-line distance**
-are checked against street routes. The interface distinguishes mapped, checked, reachable
-and unknown-route counts. Results are a bounded shortlist, not an exhaustive business
-count; the closest checked route is not guaranteed to be the closest of all mapped
-places. Building centres can differ from entrances. Recorded opening hours are not a
-live open/closed check. Nearby reachability currently uses walking only.
+On smaller screens, the settings buttons reveal each tool's controls. Route and source
+details open in windows within the tool. Map clicks move a destination only after you
+enable the placement action.
 
-**Compare journeys** guides you through destination, addresses and travel days. Select
-a common destination and an arrival/return schedule to compare morning and return travel,
-walking, transfers and totals across the selected days. Settings sit beside the compact
-results table. Select an address's **Daily journeys & routes** button, open a date and
-select **Show route map** to display the journey in its detail window. **Locations map**
-opens the address map without replacing the results. Transit maps use official
-GTFS shape segments matched to the scheduled stops; missing geometry is shown explicitly
-as dashed stop-to-stop links. Pedestrian segments use street routes, with estimated short
-access links marked separately. The maps do not revise scheduled transfer times.
+## How each feature is implemented
 
-**Explore commute areas** keeps the map alongside a searchable list of reachable stops.
-Select a stop to open its journey and route map. **Transport network** provides separate
-views for stops/routes, the service calendar, hourly departures and network changes.
-Search for a stop or select it on the map to inspect its service and filter connected
-routes; **Show all routes** clears the selection. Switching tools retains your inputs.
-Both planning maps require an explicit placement action before clicks move a destination.
-On mobile, **Journey settings** and **Destination & limits** reveal their respective
-controls; calculation closes those controls to bring the results back into view.
+### Milan address autocomplete
 
-Save travel settings in your browser, copy a comparison link, or export journeys as CSV.
-Shared links contain selected locations and the schedule; recipients need access to
-the same running application. A localhost link is only usable on its host machine.
+After at least three characters and a 600 ms typing pause, the browser calls
+`GET /api/places?q=...`. The server queries **Photon**, an OpenStreetMap geocoder,
+with a Milan bounding box and centre bias. It filters results to Milan, deduplicates
+labels and returns up to five suggestions. Arrow keys and Enter select a result;
+Escape closes suggestions. **Search** performs an immediate lookup.
 
-Address fields suggest Milan streets and addresses through Photon after three characters
-and a short typing pause. Select with the mouse or arrow keys and Enter; Escape closes
-suggestions. The Search button also performs an immediate lookup. Address and destination
-access walks use FOSSGIS pedestrian street routing. Up to twelve nearby boarding stops
-per location are considered, with a 90-minute search window each way. Transfer walks
-remain estimates; station entrances and accessibility are not verified. Search queries
-are sent as you type, and walking coordinates are sent to the routing provider. No account is required.
-Weekly totals are withheld if any selected date or round trip is unavailable. Night shifts
-across dates are unsupported.
+Code: [autocomplete.ts](frontend/src/autocomplete.ts),
+[places.py](ingestion/milano_mobility/places.py).
 
-The **Explore commute areas** tool also lets you explore areas within 15,
-30, 45 or 60 minutes of a destination and inspect journeys from reachable stops.
+### Nearby places and category comparison
 
-The commute map uses scheduled services, up to two transfers, a two-minute transfer
-allowance, and estimated walking links. Walking uses 4.5 km/h and a 30% distance allowance,
-with a selectable 5, 10 or 15 minute limit per walking leg. Shading uses 100 m cells and
-is an approximate walking catchment, not a street-routed isochrone: barriers, station entrances and
-accessibility are not modeled. Live positions, delays and cancellations are not included.
-Service dates are limited to the published timetable; historical dates are labeled.
+`POST /api/nearby` queries **Overpass** for OpenStreetMap nodes, ways and relations
+within 500, 1,000 or 1,500 metres of each address. Categories cover cafés, supermarkets,
+cinemas, bookshops, libraries, pharmacies, restaurants, parks, post offices, banks,
+medical care and gyms.
 
-Behind the map is a reproducible local-first data platform: an immutable source archive,
-a tested analytical model, and network analytics available below the commute explorer.
+Discovery, classification and the interface share
+[category_rules.json](ingestion/milano_mobility/category_rules.json). Each category
+requires explicit service tags. Names and brands do not determine categories;
+ambiguous types and records explicitly marked inactive or private/no-access are
+excluded. Multiple categories require independent evidence. **Categories & data**
+explains the rules; place details show the recorded type and restrictions.
 
-## How it works
+For each address/category, the server checks the nearest **20 mapped candidates by
+straight-line distance** using the pedestrian **OSRM Table API**. The table reports
+how many checked places fall within a 5/10/15/20-minute walk and the shortest checked
+walking time. It distinguishes mapped, checked, reachable and unknown-route counts.
+Shortest walks are highlighted only when all compared addresses have complete checks
+and uncapped shortlists. Address and already-loaded category toggles update results
+locally; a new category requires another comparison.
 
-Each run downloads the current GTFS archive, identifies it by SHA-256, and keeps the
-original file in MinIO (or an optional local archive). A streaming quality gate checks the feed before PostgreSQL is
-allowed to replace the current staging snapshot. dbt then builds network history,
-service-day facts, and compact tables for the dashboard.
+Results are bounded shortlists, not exhaustive business counts. Strict classification
+can omit incompletely tagged places, and source records can still be wrong. Recorded
+opening hours are displayed without a live open/closed check. Nearby reachability
+uses walking only.
+
+Code: [nearby.ts](frontend/src/nearby.ts), [nearby.py](ingestion/milano_mobility/nearby.py),
+[category_rules.py](ingestion/milano_mobility/category_rules.py).
+
+### Walking directions and route windows
+
+`POST /api/walking-route` calls the pedestrian **OSRM Route API** for a path, duration,
+distance and turn instructions. **MapLibre GL** draws the GeoJSON in the place's detail
+window. MapLibre renders the map; OSRM calculates the walking route.
+
+Walking calculations include short links from coordinates to the routed street at
+4.5 km/h. Snaps beyond 100 metres are rejected; unavailable routes remain unknown.
+Building centres can differ from entrances, and accessibility is not verified.
+
+`POST /api/journey-map` combines pedestrian routes with official **GTFS shapes** matched
+to each transit trip and its ordered stops. Missing transit geometry appears as dashed
+stop-to-stop links. Estimated access links and missing walking geometry are identified
+separately. Displaying a map does not revise calculated timetable or transfer times.
+
+Code: [route-view.ts](frontend/src/route-view.ts),
+[route_maps.py](ingestion/milano_mobility/route_maps.py).
+
+### Scheduled journey comparison
+
+`POST /api/comparison` reads the locally published **GTFS timetable in PostgreSQL**.
+The dbt models `commute_connections`, `commute_service` and `commute_stops` prepare
+routing data. There is no external transit-directions API.
+
+The server shortlists up to twelve nearby boarding stops per location and uses the
+**OSRM Table API** for street walking between addresses, stops and the destination.
+Connection scans find morning journeys arriving by the requested time and return
+journeys leaving at the requested time, within a 90-minute window each way. Routing
+allows up to two transfers with a two-minute transfer allowance. Transfer walks remain
+estimates. A return ten minutes later is also calculated for comparison.
+
+The algorithm handles calendar exceptions, previous service days' after-midnight trips
+and boarding/alighting restrictions. Times use Europe/Rome. Weekly totals are withheld
+if any selected date or round trip is unavailable. The interface shows timetable
+coverage and expiry. Overnight work shifts across dates are unsupported.
+
+Code: [comparison.ts](frontend/src/comparison.ts),
+[comparison.py](ingestion/milano_mobility/comparison.py),
+[commute.py](ingestion/milano_mobility/commute.py),
+[dbt marts](transformations/dbt/models/marts).
+
+### Commute area map
+
+`GET /api/commute` accepts a destination (`lat`, `lon`), `date`, arrival `time`, total
+`minutes` (15/30/45/60) and per-leg `walk` limit (5/10/15). A reverse connection scan
+of the local GTFS tables finds the latest departures from reachable stops.
+
+Area calculations use **estimated geometric walking links** at 4.5 km/h with a 30%
+distance allowance. Shading uses 100-metre cells; it is not a street-routed isochrone
+and does not model barriers, entrances or accessibility. Calculating the area needs no
+external routing request. Opening a stop's route window subsequently uses the
+journey-map endpoint. Stop search uses local GTFS stop names.
+
+Code: [commute.ts](frontend/src/commute.ts), [commute.py](ingestion/milano_mobility/commute.py).
+
+### Transport network and base maps
+
+`GET /api/dashboard` reads **dbt/PostgreSQL aggregates** for service volume, stop calls,
+route coverage, service dates, departures by service hour and changes between imported
+network snapshots. `GET /api/route-shapes?route_sk=...` loads official GTFS shapes.
+Stops are clustered in the browser; selecting one filters its connected routes.
+
+All maps use **MapLibre GL** with raster tiles requested directly by the browser from
+**OpenStreetMap**. Tiles supply map context, not schedules or routing calculations.
+
+Code: [map.ts](frontend/src/map.ts), [index.html](ingestion/milano_mobility/static/index.html),
+[web.py](ingestion/milano_mobility/web.py).
+
+### Saved addresses, comparison links and CSV
+
+Shared addresses and saved travel settings use browser **localStorage**. Comparison
+links encode locations and the schedule in the URL fragment; calculated results are
+not included and must be refreshed. Recipients need access to the same application;
+a localhost link is only usable on its host machine. Journey CSV exports are generated
+in the browser. No external API or user account is used. Older saved address lists and
+comparison links remain supported.
+
+Code: [addresses.ts](frontend/src/addresses.ts), [comparison.ts](frontend/src/comparison.ts).
+
+### Timetable updates
+
+**Update data** calls `POST /api/refresh`; `GET /api/refresh` returns progress. Matching
+source HTTP metadata avoids downloading again. Otherwise the pipeline downloads the
+**Comune di Milano / AMAT GTFS ZIP**, identifies it by SHA-256 and archives it in
+**MinIO** or an optional local directory. Identical payloads are skipped. Validation
+quarantines invalid feeds; successful loads build and test dbt models before publication.
+The last published snapshot stays available during processing. Cancellation uses
+`POST /api/refresh/cancel`.
+
+The server checks every 24 hours while running, with the first automatic check after
+that interval. Set `DASHBOARD_AUTO_UPDATE_HOURS=0` when Airflow handles updates.
 
 ```mermaid
 flowchart LR
-    Source[Official GTFS] --> Archive[(MinIO archive)]
-    Source --> Validate{Quality gate}
+    Source[Official GTFS ZIP] --> Archive[(MinIO or local archive)]
+    Archive --> Validate{Quality gate}
     Validate -->|invalid| Quarantine[(Quarantine)]
     Validate -->|valid| Stage[(PostgreSQL staging)]
     Stage --> Model[dbt models and tests]
-    Model --> Dashboard[Interactive dashboard]
+    Model --> Publish[Published snapshot]
+    Publish --> API[Python API]
+    API --> UI[Browser tools]
 ```
 
-Two dates are kept deliberately separate: the snapshot date says when a network version
-was acquired, while the service date says when a trip is scheduled to run. Loading a new
-official version therefore adds history without rewriting what an older snapshot meant.
+`snapshot_date` identifies the acquired network version; `service_date` is when a trip
+runs. New snapshots add network history. Routing uses the read-only BI account with a
+30-second statement timeout and caches up to eight timetable windows keyed by published run.
 
-## Run it
+Code: [pipeline.py](ingestion/milano_mobility/pipeline.py),
+[web.py](ingestion/milano_mobility/web.py).
 
-You need Docker with Compose, an internet connection, about 8 GB of available memory, and
-enough disk space for the full feed.
+## External services and configuration
+
+| Data or API | Default endpoint | Configuration | Information sent |
+| --- | --- | --- | --- |
+| Official GTFS | `https://dati.comune.milano.it/gtfs.zip` | `GTFS_SOURCE_URL` | Feed request; no user addresses |
+| Photon | `https://photon.komoot.io/api/` | `GEOCODER_URL` | Typed search text and Milan bounds |
+| Overpass | `https://overpass-api.de/api/interpreter` | `OVERPASS_URL` | Address coordinates, radius and service-tag queries |
+| OSRM pedestrian routing | `https://routing.openstreetmap.de/routed-foot`, then `/table/v1/foot/...` or `/route/v1/foot/...` | `WALK_ROUTER_URL` | Coordinates of locations, stops and places |
+| OpenStreetMap tiles | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | `MAP_STYLE` in `frontend/src/map.ts` | Visible map tile requests from the browser |
+| Open-Meteo historical weather (optional analytics) | `https://archive-api.open-meteo.com/v1/archive` | `WEATHER_API_URL` | Service-area coordinates and date range |
+
+The default integrations require no API keys. Search and routing calls go through the
+Python server and are cached, with at least 1.1 seconds between requests to each of
+those services. Overpass requests are serialized and cached by address/radius/UTC day.
+No background city-wide scraping is performed. Provider calls require internet access
+even with a locally loaded timetable.
+
+For public traffic, configure dedicated services under the
+[Photon usage policy](https://github.com/komoot/photon#demo-server),
+[FOSSGIS service policy](https://routing.openstreetmap.de/about.html) and
+[Overpass resource guidance](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html).
+The public endpoints are shared services with usage limits.
+
+Copy [.env.example](.env.example) to `.env` to change providers, ports, credentials,
+source metadata or schedules. `.env` is ignored by Git. The official feed's source and
+licence metadata are configured as Comune di Milano / AMAT, CC BY 4.0; see the
+[dataset listing](https://dati.comune.milano.it/en/dataset/ds929-orari-del-trasporto-pubblico-locale-nel-comune-di-milano-in-formato-gtfs).
+
+Optional Airflow schedules ingestion, quality checks and weather backfills. Metabase and
+[analytical queries](dashboards/questions.sql) support warehouse exploration. Open-Meteo
+weather enrichment does not affect journeys or nearby-place rankings. Terraform in
+`infrastructure/` is reference infrastructure, not required for the local planner.
+
+## Run locally
+
+You need Docker with Compose, internet access, about 8 GB of available memory and disk
+space for the full feed. From Linux, macOS or Windows PowerShell:
 
 ```bash
 docker compose --profile demo run --build --rm demo
 ```
 
-The command works in Linux and macOS terminals and in Windows PowerShell. It builds the
-images, downloads the complete official feed, validates and models it, and leaves the
-dashboard running at <http://localhost:8501>. Repeating the command with an unchanged feed
-returns `SKIPPED` instead of loading the same payload twice.
+This builds the app, imports the official timetable and leaves the dashboard at
+<http://localhost:8501>. An unchanged feed returns `SKIPPED`. Docker compiles the
+TypeScript frontend, so Node.js is not needed on the host.
 
-The dashboard includes service volume, route coverage, network changes, and an interactive
-MapLibre stop map. Stops are clustered for smooth navigation; select one to see its
-scheduled calls and draw every official GTFS route shape serving it. The TypeScript map is
-compiled inside the Docker image, so running the project does not require Node.js locally.
-Use **Update data** in the dashboard to check the official source. Matching HTTP metadata
-ends the check immediately without downloading the archive; a newer version starts a full
-feed download that can be cancelled from the same button. Progress is shown in the header
-while the last published snapshot remains available, and new data only appears after
-validation and dbt tests finish successfully.
-The server also checks every 24 hours while running; the first automatic check occurs
-after that interval. Set `DASHBOARD_AUTO_UPDATE_HOURS=0` if Airflow already handles
-updates. The comparison displays the timetable's service-date coverage and flags expiry.
-
-For an existing installation, build the new commute tables once, then rebuild the app:
+For an existing installation missing the commute tables, build them before restarting:
 
 ```bash
 docker compose run --rm --entrypoint dbt pipeline build --select commute_connections commute_service commute_stops commute_trip_shapes --project-dir /workspace/transformations/dbt --profiles-dir /workspace/transformations/dbt
 docker compose up -d --build frontend
 ```
 
-The commute API (`GET /api/commute`) accepts `lat`, `lon`, `date` (YYYY-MM-DD),
-`time` (HH:MM, Europe/Rome), `minutes` (15/30/45/60), and `walk` (5/10/15).
-It computes latest departures using reverse connection scans, including prior service
-days' after-midnight trips and calendar exceptions. It excludes boarding/alighting that
-requires arrangements or is prohibited. Adjacent connections are materialized once per
-source trip; they are joined to service dates only for the requested travel window.
-An in-memory cache holds up to eight timetable windows keyed by published pipeline run.
-Routing reads through the BI account with a 30-second database statement timeout.
-
-Stop the services without deleting their data with:
+Stop services without deleting their data:
 
 ```bash
 docker compose down
 ```
 
-## Configuration
-
-The checked-in defaults are enough for the local demo. To change ports, credentials,
-source metadata, schedules, service-area settings, or the optional weather provider, copy
-`.env.example` to `.env` and edit only the values you need. `.env` is ignored by Git.
-
-`OVERPASS_URL` configures nearby-place discovery (default: `https://overpass-api.de/api/interpreter`).
-Small local requests are cached per address/radius/day and serialized; pedestrian requests
-are cached and spaced at least 1.1 seconds apart. Use a dedicated Overpass instance for a
-public application, following the [Overpass resource guidance](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html).
-No background city-wide scraping is performed.
-
-`GEOCODER_URL` and `WALK_ROUTER_URL` configure the Photon and pedestrian OSRM services.
-The defaults use public services with cached, rate-limited requests. For public traffic,
-configure dedicated providers according to the [Photon usage policy](https://github.com/komoot/photon)
-and [FOSSGIS service policy](https://routing.openstreetmap.de/about.html).
-
-For a native Python installation, setting `LOCAL_ARCHIVE_DIRECTORY` to a persistent
-directory uses the filesystem instead of S3/MinIO. It retains immutable raw files and
-quality/quarantine reports. PostgreSQL and dbt are still required. The standard Compose
-demo retains its MinIO dependencies; setting this variable alone does not remove them.
-Use a directory mounted persistently when configuring the filesystem backend in containers.
-
-The default source is the [Comune di Milano open-data GTFS feed](https://dati.comune.milano.it/en/dataset/ds929-orari-del-trasporto-pubblico-locale-nel-comune-di-milano-in-formato-gtfs),
-published from AMAT data under CC BY 4.0. Small generated feeds under `tests/fixtures` exist
-only to keep automated tests fast and deterministic.
+For a native Python installation, `LOCAL_ARCHIVE_DIRECTORY` selects a persistent
+filesystem archive instead of S3/MinIO, retaining raw files and quality/quarantine
+reports. PostgreSQL and dbt are still required. The standard Compose demo retains its
+MinIO dependencies; setting this variable alone does not remove them.
 
 ## Development
+
+Python checks (Linux/macOS or WSL):
 
 ```bash
 make install
@@ -187,24 +248,34 @@ make quality
 make integration
 ```
 
-The quality target runs Ruff, formatting checks, strict mypy, unit tests, and coverage.
-Integration tests exercise PostgreSQL, MinIO, idempotency, quarantine behavior, dbt, and
-the read-only dashboard API.
-The optional live routing check requires a preloaded official timetable:
+`make quality` runs Ruff, formatting checks, strict mypy, unit tests and coverage.
+Integration tests require the running Compose stack and exercise PostgreSQL, MinIO,
+idempotency, quarantine, dbt and the read-only API. The optional live routing check needs
+a preloaded official timetable:
 `TEST_LIVE_FEED=1 pytest tests/integration/test_commute_live.py`.
 
-The main directories follow the data flow:
+Frontend checks and build, using Node.js (the Docker build uses Node 22):
 
-```text
-ingestion/             Fetching, validation, storage, loading, and the dashboard server
-frontend/              TypeScript MapLibre renderer and its pinned build configuration
-orchestration/dags/    Airflow schedules and backfills
-transformations/dbt/   Staging, history, facts, aggregates, and data tests
-infrastructure/        Local PostgreSQL setup and cloud reference infrastructure
-dashboards/            Reusable analytical queries
-docs/                  Decisions, operations notes, and test evidence
+```bash
+cd frontend
+npm ci
+npm run typecheck
+npm run build
 ```
 
-More detail is available in the [data dictionary](docs/data-dictionary.md),
-[architecture decision](docs/adr/001-local-first-postgres-minio.md), and
-[operations runbook](docs/runbooks/operations.md).
+For a native server, copy `frontend/dist/` into `ingestion/milano_mobility/static/dist/`.
+Docker performs that copy during its build. Generated feeds in `tests/fixtures` keep
+tests deterministic; they are not the application's default timetable.
+
+| Directory | Purpose |
+| --- | --- |
+| `ingestion/` | Downloading, validation, storage, routing and the Python HTTP server |
+| `frontend/` | TypeScript tools, MapLibre maps and pinned build configuration |
+| `transformations/dbt/` | Staging, network history, facts, routing tables and data tests |
+| `orchestration/dags/` | Optional Airflow schedules and backfills |
+| `infrastructure/` | Local PostgreSQL setup and cloud reference infrastructure |
+| `docs/` | Architecture decisions, operations and test evidence |
+
+See the [data dictionary](docs/data-dictionary.md),
+[architecture decision](docs/adr/001-local-first-postgres-minio.md) and
+[operations runbook](docs/runbooks/operations.md) for further detail.
