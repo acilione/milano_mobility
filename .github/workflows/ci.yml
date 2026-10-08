@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Gitleaks scans commit ranges, including the parent of the first pushed commit.
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
@@ -23,7 +26,10 @@ jobs:
       - run: ruff format --check ingestion orchestration tests
       - run: mypy ingestion
       - run: pytest -m "not integration" --cov --cov-report=xml
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
 
   integration:
     runs-on: ubuntu-24.04
