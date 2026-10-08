@@ -43,6 +43,8 @@ jobs:
           cache-dependency-path: requirements-dev.lock
       - run: pip install -r requirements-dev.lock -e .
       - run: pip install -r requirements-dbt.lock
+      - name: Build the pinned MinIO server and client
+        run: docker compose build minio minio-init
       - run: docker compose up -d --wait postgres minio
       - run: docker compose run --rm minio-init
       - run: pytest -m integration

@@ -220,6 +220,12 @@ This builds the app, imports the official timetable and leaves the dashboard at
 <http://localhost:8501>. An unchanged feed returns `SKIPPED`. Docker compiles the
 TypeScript frontend, so Node.js is not needed on the host.
 
+MinIO and its client are compiled from pinned upstream releases using
+[`infrastructure/minio/Dockerfile`](infrastructure/minio/Dockerfile), because their
+original prebuilt images are no longer available. The first build takes longer;
+Docker caches subsequent builds. The existing server and client release versions
+are retained, and the build verifies their source commit IDs.
+
 For an existing installation missing the commute tables, build them before restarting:
 
 ```bash
